@@ -29,7 +29,7 @@ namespace webifc::geometry
 {
     constexpr size_t MAPPED_REPRESENTATION_CACHE_BYTE_LIMIT = 32 * 1024 * 1024;
     constexpr size_t MAPPED_REPRESENTATION_CACHE_ENTRY_LIMIT = 4096;
-    
+
     double BOOLSTATUS = 0;
 
     IfcGeometryProcessor::IfcGeometryProcessor(webifc::parsing::IfcLoader &loader, const webifc::schema::IfcSchemaManager &schemaManager, uint16_t circleSegments, bool coordinateToOrigin, double TOLERANCE_PLANE_INTERSECTION, double TOLERANCE_PLANE_DEVIATION, double TOLERANCE_BACK_DEVIATION_DISTANCE, double TOLERANCE_INSIDE_OUTSIDE_PERIMETER, double TOLERANCE_SCALAR_EQUALITY, double PLANE_REFIT_ITERATIONS, double BOOLEAN_UNION_THRESHOLD)
@@ -322,7 +322,7 @@ namespace webifc::geometry
                 auto geom = SectionedSurface(_geometryLoader.GetCrossSections3D(expressID), lineType != schema::IFCSECTIONEDSURFACE);
 
                 mesh.transformation = glm::dmat4(1);
-                
+
                 _expressIDToGeometry[expressID] = geom;
                 mesh.hasGeometry = true;
 
@@ -1500,6 +1500,7 @@ namespace webifc::geometry
             case schema::IFCINDEXEDPOLYCURVE:
             case schema::IFCTRIMMEDCURVE:
             case schema::IFCGRADIENTCURVE:
+            case schema::IFCSEGMENTEDREFERENCECURVE:
             {
                 auto lineProfileType = _loader.GetLineType(expressID);
                 IfcCurve curve = _geometryLoader.GetCurve(expressID, 3, false);
