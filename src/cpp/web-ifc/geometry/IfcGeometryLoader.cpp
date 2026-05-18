@@ -136,7 +136,7 @@ namespace webifc::geometry
       }
       double minDistance = mapPlacements.begin()->first;
       double maxDistance = mapPlacements.rbegin()->first;
-      
+
       IfcCurve BasisCurve = GetLocalCurve(curveID);
       if (BasisCurve.points.size() == 0)
       {
@@ -149,7 +149,7 @@ namespace webifc::geometry
       {
           it.second = BasisCurve.getPlacementAtDistance(it.first, IfcCurve::CurvePlacementMode::TangentAsZAxis);
       }
-      
+
       if (minDistance <= 0)
       {
           glm::dmat4 result = BasisCurve.getPlacementAtDistance(0, IfcCurve::CurvePlacementMode::TangentAsZAxis);
@@ -251,9 +251,9 @@ namespace webifc::geometry
             spdlog::error("[IFCSECTIONEDSOLIDHORIZONTAL] unexpected Location type {}", CrossSectionPositionID, linearPlacementType);
             continue;
         }
-    
+
         glm::dvec3 Axis = glm::dvec3(0, 0, 1);
-        
+
         _loader.MoveToArgumentOffset(CrossSectionPositionID, 0);
         auto tokenTypeLocation = _loader.GetTokenType();
         // Location is not optional, but check anyway:
@@ -261,7 +261,7 @@ namespace webifc::geometry
         {
             _loader.StepBack();
             uint32_t LocationID = _loader.GetRefArgument();
-            
+
             // Axis is optional:
             _loader.MoveToArgumentOffset(CrossSectionPositionID, 1);
             auto tokenTypeAxis = _loader.GetTokenType();
@@ -298,7 +298,7 @@ namespace webifc::geometry
                 }
                 _loader.GetTokenType();
                 double DistanceAlong = _loader.GetDoubleArgument();
-                
+
                 // OffsetLateral, OffsetVertical, OffsetLongitudinal is considered later when the actual matrix is computed
 
                 _loader.MoveToArgumentOffset(LocationID, 5);
@@ -339,7 +339,7 @@ namespace webifc::geometry
           spdlog::error("[IFCSECTIONEDSOLIDHORIZONTAL] no valid CrossSections");
           return sections;
       }
-	  
+
       std::set<double> distancesWithCrossSection;
       auto it = mapCurveToDistanceAlong.find(DirectrixId);
       if( it != mapCurveToDistanceAlong.end())
@@ -367,8 +367,8 @@ namespace webifc::geometry
 #endif
 
 
-          // the curve may have more points than we have cross sections. 
-          // the cross sections are not directly given with a distance, but we can compute the distance between 
+          // the curve may have more points than we have cross sections.
+          // the cross sections are not directly given with a distance, but we can compute the distance between
 
           for (uint32_t i = 0; i < currentProfile.curve.points.size(); i++)
           {
@@ -1332,8 +1332,8 @@ namespace webifc::geometry
 
         // Important not to repeat the last point otherwise triangulation fails
         // if the list has zero points this is initial, no repetition is possible, otherwise we must check
-        auto nearEqual = [](const auto& p1, const auto& p2) { 
-            return distance(p1, p2) < EPS_BIG; 
+        auto nearEqual = [](const auto& p1, const auto& p2) {
+            return distance(p1, p2) < EPS_BIG;
         };
 
         // Important not to repeat the last point otherwise triangulation fails
@@ -1385,11 +1385,11 @@ namespace webifc::geometry
 			// 	std::ofstream logFile("C:/Users/" + std::string(getenv("USERNAME")) + "/Desktop/log/curve.txt");
 			// 	logFile << "=== CURVE PRINTED ===" << std::endl;
 			// 	logFile << "Total edges: " << curve.points.size() << std::endl << std::endl;
-				
+
 			// 	for (size_t i = 0; i < curve.points.size(); i++) {
-			// 		logFile << "  Point [" << i << "]: x=" << curve.points[i].x 
+			// 		logFile << "  Point [" << i << "]: x=" << curve.points[i].x
 			// 			      << ", y=" << curve.points[i].y << std::endl;
-					
+
 			// 	}
 			// 	logFile.close();
 			// }
@@ -1483,12 +1483,12 @@ namespace webifc::geometry
       _loader.MoveToArgumentOffset(expressID, 2);
       uint32_t CurveRef = _loader.GetRefArgument();
       IfcCurve curve;
-      
+
       edgeParams.dimensions = 3;
       edgeParams.edge = true;
       edgeParams.sameSense = -1;
       edgeParams.trimSense = TRIM_SENSE_SAME;
-      
+
       ComputeCurve(CurveRef, curve, edgeParams);
 
       return curve;
@@ -1712,7 +1712,7 @@ namespace webifc::geometry
   {
       if (curve.points.empty())
           return 0.0;
-            
+
       double lengthToPoint = ComputeLengthToPoint(curve, point);
       return (totalLength > 0.0) ? (lengthToPoint / totalLength) : 0.0;
   }
@@ -1778,7 +1778,7 @@ namespace webifc::geometry
       {
           uint32_t segmentId = _loader.GetRefArgument(segments[ii]);
           ComputeCurve(segmentId, curve, params);
-          
+
         #ifdef DEBUG_DUMP_SVG
           dump::DumpCurveToHtml(curve.points, "dumpCurve.html");
         #endif
@@ -2325,7 +2325,7 @@ namespace webifc::geometry
         }
         curve.endTangent = tangentSign * curve.endTangent;
         startTangent = tangentSign * startTangent;
-        
+
         curve.segmentStartTangents.push_back(startTangent);
 
         if (params.sameSense == TRIM_SENSE_REVERSE)
@@ -2361,11 +2361,11 @@ namespace webifc::geometry
 			// 	std::ofstream logFile("C:/Users/" + std::string(getenv("USERNAME")) + "/Desktop/log/log.txt");
 			// 	logFile << "=== POLYGON EDGES PRINTED ===" << std::endl;
 			// 	logFile << "Total edges: " << polygonEdgesPrinted.size() << std::endl << std::endl;
-				
+
 			// 	for (size_t i = 0; i < polygonEdgesPrinted.size(); i++) {
 			// 		logFile << "Edge [" << i << "]:" << std::endl;
 			// 		for (size_t j = 0; j < polygonEdgesPrinted[i].size(); j++) {
-			// 			logFile << "  Point [" << j << "]: x=" << polygonEdgesPrinted[i][j].x 
+			// 			logFile << "  Point [" << j << "]: x=" << polygonEdgesPrinted[i][j].x
 			// 			        << ", y=" << polygonEdgesPrinted[i][j].y << std::endl;
 			// 		}
 			// 	}
@@ -2387,10 +2387,10 @@ namespace webifc::geometry
         auto segmentTokens = _loader.GetSetArgument();   // Gradient segments
         auto u = _loader.GetStringArgument();            // SelfIntersect attribute
         uint32_t BaseCurveID = _loader.GetRefArgument(); // BaseCurve reference
-        
+
         // Get the 2D base curve (projection)
         curve = GetCurve(BaseCurveID, 2, false); // BaseCurve is 2D
-               
+
 
         IfcCurve gradientCurve;  // Segments have to be in one curve, otherwise transition like CONTSAMEGRADIENT does not work
         for (size_t ii = 0; ii < segmentTokens.size(); ++ii)
@@ -2488,7 +2488,7 @@ namespace webifc::geometry
                     adjustedPoints.push_back(glm::dvec3(basePoint.x, basePoint.y, zValue));
                 }
                 curve.points = adjustedPoints; // Update curve with 3D points
-                
+
             }
         }
         else
@@ -2499,6 +2499,21 @@ namespace webifc::geometry
         // #ifdef DEBUG_DUMP_SVG
         //     webifc::io::DumpGradientCurve(gradientSegments, curve, "V_gradient.obj", "H_gradient.obj");
         // #endif
+        break;
+    }
+    case schema::IFCSEGMENTEDREFERENCECURVE:
+    {
+        // IfcSegmentedReferenceCurve — similar to IfcGradientCurve but with cant.
+        // For visualization purposes, just use the base curve (the gradient curve).
+        //   Arg 0: Segments
+        //   Arg 1: SelfIntersect
+        //   Arg 2: BaseCurve (typically IFCGRADIENTCURVE)
+        //   Arg 3: EndPoint (optional)
+        _loader.MoveToArgumentOffset(expressID, 0);
+        _loader.GetSetArgument(); // skip segments
+        _loader.GetStringArgument(); // skip SelfIntersect
+        uint32_t baseCurveID = _loader.GetRefArgument();
+        curve = GetCurve(baseCurveID, 3, false);
         break;
     }
     case schema::IFCCURVESEGMENT:
@@ -2515,7 +2530,7 @@ namespace webifc::geometry
 
       _loader.MoveToArgumentOffset(expressID, 1);
       uint32_t placementID = _loader.GetRefArgument();
-      
+
       // SegmentStart:    TYPE IfcCurveMeasureSelect = SELECT(IfcLengthMeasure, IfcParameterValue);
       _loader.MoveToArgumentOffset(expressID, 2);
 
@@ -2542,14 +2557,14 @@ namespace webifc::geometry
 
       _loader.MoveToArgumentOffset(expressID, 6);
       uint32_t ParentCurveID = _loader.GetRefArgument();
-      
+
       ComputeCurveParams segmentParams;
       segmentParams.trimStart = startTrim;
       segmentParams.trimEnd = endTrim;
       segmentParams.hasTrim = true;
       size_t curvePointsOffset = curve.points.size();
       glm::dvec3 previousEndTangent = curve.endTangent;
-      
+
       segmentParams.ignorePlacement = true;
       segmentParams.dimensions = 3;
       segmentParams.edge = false;
@@ -2562,7 +2577,7 @@ namespace webifc::geometry
 }
 
       ComputeCurve(ParentCurveID, curve, segmentParams);
-      
+
       bool applyOwnPlacement = true;
       if (params.ignorePlacement) {
           applyOwnPlacement = false;
@@ -2573,7 +2588,7 @@ namespace webifc::geometry
       {
           // previous segment's end point for continuity check
           glm::dvec3 previousSegmentEndPoint = curve.points[curvePointsOffset - 1];
-                    
+
           bool connectTranslate = false;
           if ((Transition.compare("CONTSAMEGRADIENTSAMECURVATURE") == 0 || Transition.compare("CONTSAMEGRADIENT") == 0))
           {
@@ -2610,7 +2625,7 @@ namespace webifc::geometry
                       // TRANSLATE points to the origin for rotation (Rotation must be around currentSegmentStart)
                       glm::dvec3 relativePoint = point - currentSegmentStart;
 
-                      // ROTATE the points with dmat3 multiplication, assuming relativePoint is (x, y, 0). 
+                      // ROTATE the points with dmat3 multiplication, assuming relativePoint is (x, y, 0).
                       // We need to convert relativePoint to a homogeneous vector (x, y, 1) for dmat3.
                       glm::dvec3 rotatedPoint = rotation_matrix * glm::dvec3(relativePoint.x, relativePoint.y, 1.0);
 
@@ -2680,7 +2695,7 @@ namespace webifc::geometry
           tangent = glm::dvec3(tangent2D, 0);
 
       }
-      
+
       // Re-write the globally aligned points back into the main curve storage
       for (size_t i = 0; i < currentSegmentPoints.size(); ++i)
       {
@@ -2942,7 +2957,7 @@ namespace webifc::geometry
     }
     case schema::IFCCLOTHOID:
     {
-        // we need numSegments points along the clothoid. 
+        // we need numSegments points along the clothoid.
         // But we also need the exact end point and tangent, because roads and railways need a precise transition between segments
         _loader.MoveToArgumentOffset(expressID, 0);
         uint32_t positionID = _loader.GetRefArgument();
@@ -4077,7 +4092,7 @@ namespace webifc::geometry
           //  IfcCartesianPoint							LocalOrigin;
           //  IfcReal									Scale;					//optional
           //  IfcDirection								Axis3;					//optional
-  
+
           // IfcCartesianTransformationOperator3DnonUniform:
           //IfcReal										Scale2;					//optional
           //IfcReal										Scale3;					//optional
