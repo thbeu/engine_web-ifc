@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
- 
+
 #include <vector>
 #include <istream>
 #include "IfcTokenStream.h"
@@ -9,16 +9,19 @@
 namespace webifc::parsing
 {
 
-  IfcTokenStream::IfcTokenStream(const size_t chunkSize, const uint64_t maxChunks) 
-  :  _chunkSize(chunkSize), _maxChunks(maxChunks)
-  { 
+  IfcTokenStream::IfcTokenStream(const size_t chunkSize, const uint64_t maxChunks)
+  :  _chunkSize(chunkSize), _maxChunks(maxChunks), _ownsChunks(true)
+  {
     _cChunk=nullptr;
     _fileStream=nullptr;
   }
 
-  IfcTokenStream::~IfcTokenStream() 
+  IfcTokenStream::~IfcTokenStream()
   {
-    for (size_t i=0; i < _chunks.size();i++)  _chunks[i].Clear(true);
+    if (_ownsChunks)
+    {
+        for (size_t i=0; i < _chunks.size();i++)  _chunks[i].Clear(true);
+    }
     _chunks.clear();
     std::vector<IfcTokenChunk>().swap(_chunks);
     delete _fileStream;
@@ -68,7 +71,7 @@ bool IfcTokenStream::SetTokenSource(std::istream &requestData)
       }
       auto length = _cChunk->Read<uint16_t>(_readPtr);
       Forward(2);
-      if (length > 0) 
+      if (length > 0)
       {
         auto str = _cChunk->ReadString(_readPtr,length);
         Forward(length);
@@ -81,7 +84,7 @@ bool IfcTokenStream::SetTokenSource(std::istream &requestData)
   {
      for (size_t i=_chunks.size()-1; i >=0; i--)
       {
-        if (_chunks[i].GetTokenRef() <= pos) 
+        if (_chunks[i].GetTokenRef() <= pos)
         {
           _currentChunk = i;
           _cChunk = &_chunks[_currentChunk];
@@ -90,11 +93,11 @@ bool IfcTokenStream::SetTokenSource(std::istream &requestData)
         }
       }
   }
-  
+
   void IfcTokenStream::checkMemory()
   {
     if (_maxChunks != 0 && _activeChunks == _maxChunks){
-      for (uint32_t x = 0; x < _chunks.size(); x++) 
+      for (uint32_t x = 0; x < _chunks.size(); x++)
       {
         if (_chunks[x].IsLoaded())
         {
@@ -107,7 +110,7 @@ bool IfcTokenStream::SetTokenSource(std::istream &requestData)
       }
     }
   }
-  
+
   void IfcTokenStream::Push(void *v, const size_t size)
   {
       if (_chunks.empty())
@@ -125,7 +128,7 @@ bool IfcTokenStream::SetTokenSource(std::istream &requestData)
       }
       _chunks.back().Push(v,size);
   }
-  
+
   size_t IfcTokenStream::GetTotalSize()
   {
     if (_chunks.size()==0) return 0;
@@ -138,11 +141,11 @@ bool IfcTokenStream::SetTokenSource(std::istream &requestData)
   }
 
   IfcTokenStream * IfcTokenStream::Clone() {
-    IfcTokenStream * newStream = new IfcTokenStream(_activeChunks,_maxChunks,_chunks,_fileStream->Clone());
+    IfcTokenStream * newStream = new IfcTokenStream(_activeChunks,_maxChunks,_chunks,_fileStream->Clone(), false);
     return newStream;
   }
 
-  IfcTokenStream::IfcTokenStream(size_t activeChunks, uint64_t maxChunks, std::vector<IfcTokenStream::IfcTokenChunk> &chunks,IfcTokenStream::IfcFileStream * fileStream) : _activeChunks(activeChunks), _maxChunks(maxChunks), _chunks(chunks),  _cChunk(&chunks[0]), _fileStream(fileStream)
+  IfcTokenStream::IfcTokenStream(size_t activeChunks, uint64_t maxChunks, std::vector<IfcTokenStream::IfcTokenChunk> &chunks,IfcTokenStream::IfcFileStream * fileStream, bool ownsChunks) : _activeChunks(activeChunks), _maxChunks(maxChunks), _chunks(chunks),  _cChunk(&chunks[0]), _fileStream(fileStream), _ownsChunks(ownsChunks)
   {}
 
 }
