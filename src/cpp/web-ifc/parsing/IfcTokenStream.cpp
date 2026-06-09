@@ -1,7 +1,7 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
- 
+
 #include <vector>
 #include <istream>
 #include "IfcTokenStream.h"
@@ -9,16 +9,19 @@
 namespace webifc::parsing
 {
 
-  IfcTokenStream::IfcTokenStream(const size_t chunkSize, const uint64_t maxChunks) 
-  :  _chunkSize(chunkSize), _maxChunks(maxChunks)
-  { 
+  IfcTokenStream::IfcTokenStream(const size_t chunkSize, const uint64_t maxChunks)
+  :  _chunkSize(chunkSize), _maxChunks(maxChunks), _ownsChunks(true)
+  {
     _cChunk=nullptr;
     _fileStream=nullptr;
   }
 
-  IfcTokenStream::~IfcTokenStream() 
+  IfcTokenStream::~IfcTokenStream()
   {
-    for (size_t i=0; i < _chunks.size();i++)  _chunks[i].Clear(true);
+    if (_ownsChunks)
+    {
+        for (size_t i=0; i < _chunks.size();i++)  _chunks[i].Clear(true);
+    }
     _chunks.clear();
     std::vector<IfcTokenChunk>().swap(_chunks);
     delete _fileStream;
@@ -29,7 +32,7 @@ namespace webifc::parsing
     return 0;
   }
 
-  void IfcTokenStream::SetTokenSource(const std::function<uint32_t(char *, size_t, size_t)> &requestData, bool fromStream) 
+  void IfcTokenStream::SetTokenSource(const std::function<uint32_t(char *, size_t, size_t)> &requestData, bool fromStream)
   {
       _fileStream = new IfcFileStream(requestData,_chunkSize,fromStream);
       size_t tokenOffset=0;
@@ -48,11 +51,11 @@ namespace webifc::parsing
   }
 
   void IfcTokenStream::SetTokenSource(std::istream &requestData)
-  { 
+  {
      SetTokenSource([&](char* dest, size_t sourceOffset, size_t destSize) { requestData.seekg(sourceOffset); requestData.read(dest, destSize); return requestData.gcount();},true);
   }
-  
-  std::string_view IfcTokenStream::ReadString() 
+
+  std::string_view IfcTokenStream::ReadString()
   {
       if (!_cChunk->IsLoaded()) {
         checkMemory();
@@ -60,7 +63,7 @@ namespace webifc::parsing
       }
       auto length = _cChunk->Read<uint16_t>(_readPtr);
       Forward(2);
-      if (length > 0) 
+      if (length > 0)
       {
         auto str = _cChunk->ReadString(_readPtr,length);
         Forward(length);
@@ -68,11 +71,11 @@ namespace webifc::parsing
       }
       return "";
   }
-  
+
   void IfcTokenStream::Forward(const size_t size)
   {
       _readPtr+=size;
-       while (_readPtr >= _cChunk->TokenSize()) 
+       while (_readPtr >= _cChunk->TokenSize())
       {
         if (_currentChunk == _chunks.size()-1)
         {
@@ -84,12 +87,12 @@ namespace webifc::parsing
         _cChunk = &_chunks[_currentChunk];
       }
   }
-  
+
   void IfcTokenStream::MoveTo(const size_t pos)
   {
      for (size_t i=_chunks.size()-1; i >=0; i--)
       {
-        if (_chunks[i].GetTokenRef() <= pos) 
+        if (_chunks[i].GetTokenRef() <= pos)
         {
           _currentChunk = i;
           _cChunk = &_chunks[_currentChunk];
@@ -98,11 +101,11 @@ namespace webifc::parsing
         }
       }
   }
-  
+
   void IfcTokenStream::checkMemory()
   {
     if (_maxChunks != 0 && _activeChunks == _maxChunks){
-      for (uint32_t x = 0; x < _chunks.size(); x++) 
+      for (uint32_t x = 0; x < _chunks.size(); x++)
       {
         if (_chunks[x].IsLoaded())
         {
@@ -115,7 +118,7 @@ namespace webifc::parsing
       }
     }
   }
-  
+
   void IfcTokenStream::Push(void *v, const size_t size)
   {
       if (_chunks.empty())
@@ -133,18 +136,18 @@ namespace webifc::parsing
       }
       _chunks.back().Push(v,size);
   }
-  
+
   size_t IfcTokenStream::GetTotalSize()
   {
     if (_chunks.size()==0) return 0;
     return _chunks.back().TokenSize() + _chunks.back().GetTokenRef();
   }
-  
+
   void IfcTokenStream::Back()
   {
-      if (_readPtr == 0 ) 
+      if (_readPtr == 0 )
       {
-        if (_currentChunk > 0) 
+        if (_currentChunk > 0)
         {
           _cChunk = &_chunks[--_currentChunk];
           _readPtr=_cChunk->TokenSize()-1;
@@ -153,23 +156,23 @@ namespace webifc::parsing
       }
       _readPtr--;
   }
-  
+
   bool IfcTokenStream::IsAtEnd()
   {
      return _currentChunk >= _chunks.size()-1 && _readPtr >= _chunks.back().TokenSize();
   }
-  
-  size_t IfcTokenStream::GetReadOffset() 
+
+  size_t IfcTokenStream::GetReadOffset()
   {
       return _cChunk->GetTokenRef() + _readPtr;
   }
 
   IfcTokenStream * IfcTokenStream::Clone() {
-    IfcTokenStream * newStream = new IfcTokenStream(_activeChunks,_maxChunks,_chunks,_fileStream->Clone());
+    IfcTokenStream * newStream = new IfcTokenStream(_activeChunks,_maxChunks,_chunks,_fileStream->Clone(), false);
     return newStream;
   }
 
-  IfcTokenStream::IfcTokenStream(size_t activeChunks, uint64_t maxChunks, std::vector<IfcTokenStream::IfcTokenChunk> &chunks,IfcTokenStream::IfcFileStream * fileStream) : _activeChunks(activeChunks), _maxChunks(maxChunks), _chunks(chunks),  _cChunk(&chunks[0]), _fileStream(fileStream)
+  IfcTokenStream::IfcTokenStream(size_t activeChunks, uint64_t maxChunks, std::vector<IfcTokenStream::IfcTokenChunk> &chunks,IfcTokenStream::IfcFileStream * fileStream, bool ownsChunks) : _activeChunks(activeChunks), _maxChunks(maxChunks), _chunks(chunks),  _cChunk(&chunks[0]), _fileStream(fileStream), _ownsChunks(ownsChunks)
   {}
 
 }

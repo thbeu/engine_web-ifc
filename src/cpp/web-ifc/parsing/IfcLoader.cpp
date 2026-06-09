@@ -21,7 +21,7 @@ namespace webifc::parsing {
   std::string expandIfcGuid(const std::string_view &guid);
   std::string compressIfcGuid(const std::string& guid);
 
-   IfcLoader::IfcLoader(uint32_t tapeSize, uint64_t memoryLimit,uint32_t lineWriterBuffer, const schema::IfcSchemaManager &schemaManager) :_lineWriterBuffer(lineWriterBuffer), _schemaManager(schemaManager)
+   IfcLoader::IfcLoader(uint32_t tapeSize, uint64_t memoryLimit,uint32_t lineWriterBuffer, const schema::IfcSchemaManager &schemaManager) :_lineWriterBuffer(lineWriterBuffer), _schemaManager(schemaManager), _ownsParsedData(true)
    {
      uint64_t maxChunks;
      if (memoryLimit > 0) maxChunks = memoryLimit/tapeSize;
@@ -329,8 +329,11 @@ namespace webifc::parsing {
    IfcLoader::~IfcLoader()
    {
       delete _tokenStream;
-      for (const auto & [key, value] : _lines) delete value;
-      for (size_t i=0; i < _headerLines.size();i++) delete _headerLines[i];
+      if (_ownsParsedData)
+      {
+          for (const auto & [key, value] : _lines) delete value;
+          for (size_t i=0; i < _headerLines.size();i++) delete _headerLines[i];
+      }
       _lines.clear();
       _headerLines.clear();
    }
@@ -761,11 +764,11 @@ namespace webifc::parsing {
     }
 
     IfcLoader * IfcLoader::Clone() {
-      return new IfcLoader(_maxExpressId, _lineWriterBuffer,_schemaManager,  _tokenStream->Clone(), _lines, _headerLines, _ifcTypeToExpressID);
+      return new IfcLoader(_maxExpressId, _lineWriterBuffer,_schemaManager,  _tokenStream->Clone(), _lines, _headerLines, _ifcTypeToExpressID, false);
     }
 
-    IfcLoader::IfcLoader(uint32_t maxExpressId,uint32_t lineWriterBuffer, const schema::IfcSchemaManager &schemaManager, IfcTokenStream * tokenStream, std::unordered_map<uint32_t,IfcLine*> &lines, std::vector<IfcLine*> &headerLines,std::unordered_map<uint32_t, std::vector<uint32_t>> &ifcTypeToExpressID)
-      : _maxExpressId(maxExpressId) , _lineWriterBuffer(lineWriterBuffer), _schemaManager(schemaManager), _tokenStream(tokenStream), _lines(lines) , _headerLines(headerLines), _ifcTypeToExpressID(ifcTypeToExpressID)
+    IfcLoader::IfcLoader(uint32_t maxExpressId,uint32_t lineWriterBuffer, const schema::IfcSchemaManager &schemaManager, IfcTokenStream * tokenStream, std::unordered_map<uint32_t,IfcLine*> &lines, std::vector<IfcLine*> &headerLines,std::unordered_map<uint32_t, std::vector<uint32_t>> &ifcTypeToExpressID, bool ownsParsedData)
+      : _maxExpressId(maxExpressId) , _lineWriterBuffer(lineWriterBuffer), _schemaManager(schemaManager), _tokenStream(tokenStream), _lines(lines) , _headerLines(headerLines), _ifcTypeToExpressID(ifcTypeToExpressID), _ownsParsedData(ownsParsedData)
     {}
 
 }

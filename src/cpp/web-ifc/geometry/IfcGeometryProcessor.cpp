@@ -293,7 +293,30 @@ namespace webifc::geometry
                 auto flatFirstMeshes = flatten(firstMesh, _expressIDToGeometry, normalizeMat);
                 auto flatSecondMeshes = flatten(secondMesh, _expressIDToGeometry, normalizeMat);
 
-                IfcGeometry resultMesh = BoolProcess(flatFirstMeshes, flatSecondMeshes, "DIFFERENCE", _settings);
+                IfcGeometry resultMesh;
+                try
+                {
+                    resultMesh = BoolProcess(flatFirstMeshes, flatSecondMeshes, "DIFFERENCE", _settings);
+                }
+                catch (const std::exception &e)
+                {
+                    spdlog::error("[GetMesh()] IFCBOOLEANCLIPPINGRESULT #{} threw exception: {}", expressID, e.what());
+                }
+                catch (...)
+                {
+                    spdlog::error("[GetMesh()] IFCBOOLEANCLIPPINGRESULT #{} threw unknown exception", expressID);
+                }
+
+                if (resultMesh.numFaces == 0 && !flatFirstMeshes.empty())
+                {
+                    spdlog::warn("[GetMesh()] IFCBOOLEANCLIPPINGRESULT #{} produced empty result, falling back to first operand", expressID);
+                    IfcGeometry fallback;
+                    for (auto &g : flatFirstMeshes)
+                    {
+                        fallback.AddGeometry(g);
+                    }
+                    resultMesh = fallback;
+                }
 
                 _expressIDToGeometry[expressID] = resultMesh;
                 mesh.hasGeometry = true;
@@ -339,7 +362,30 @@ namespace webifc::geometry
                     return mesh;
                 }
 
-                IfcGeometry resultMesh = BoolProcess(flatFirstMeshes, flatSecondMeshes, std::string(op), _settings);
+                IfcGeometry resultMesh;
+                try
+                {
+                    resultMesh = BoolProcess(flatFirstMeshes, flatSecondMeshes, std::string(op), _settings);
+                }
+                catch (const std::exception &e)
+                {
+                    spdlog::error("[GetMesh()] IFCBOOLEANRESULT #{} threw exception: {}", expressID, e.what());
+                }
+                catch (...)
+                {
+                    spdlog::error("[GetMesh()] IFCBOOLEANRESULT #{} threw unknown exception", expressID);
+                }
+
+                if (resultMesh.numFaces == 0 && op == "DIFFERENCE" && !flatFirstMeshes.empty())
+                {
+                    spdlog::warn("[GetMesh()] IFCBOOLEANRESULT #{} produced empty result, falling back to first operand", expressID);
+                    IfcGeometry fallback;
+                    for (auto &g : flatFirstMeshes)
+                    {
+                        fallback.AddGeometry(g);
+                    }
+                    resultMesh = fallback;
+                }
 
                 _expressIDToGeometry[expressID] = resultMesh;
                 mesh.hasGeometry = true;

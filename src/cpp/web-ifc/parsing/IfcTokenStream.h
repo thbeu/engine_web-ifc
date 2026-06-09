@@ -1,9 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
- 
+
 #pragma once
- 
+
 #include <vector>
 #include <istream>
 #include <iostream>
@@ -11,10 +11,10 @@
 #include <string_view>
 #include <cstring>
 #include <cstdint>
- 
+
 namespace webifc::parsing
 {
-  
+
   enum IfcTokenType : char
   {
     UNKNOWN = 0,
@@ -29,9 +29,9 @@ namespace webifc::parsing
     LINE_END,
     INTEGER
   };
-  
-  
-  class IfcTokenStream 
+
+
+  class IfcTokenStream
   {
       public:
         IfcTokenStream(const size_t chunkSize, const uint64_t maxChunks);
@@ -109,7 +109,7 @@ namespace webifc::parsing
               size_t GetTokenRef();
               void Push(void *v, const size_t size);
               size_t GetMaxSize();
-              std::string_view ReadString(const size_t ptr,const size_t size); 
+              std::string_view ReadString(const size_t ptr,const size_t size);
               template <typename T> T Read(const size_t ptr)
               {
                 if (!_loaded) Load();
@@ -131,10 +131,11 @@ namespace webifc::parsing
             	uint8_t *_chunkData;
               IfcFileStream *_fileStream;
         };
-        IfcTokenStream(size_t activeChunks, uint64_t maxChunks, std::vector<IfcTokenChunk> &chunks,IfcFileStream * fileStream);
+        IfcTokenStream(size_t activeChunks, uint64_t maxChunks, std::vector<IfcTokenChunk> &chunks,IfcFileStream * fileStream, bool ownsChunks = true);
         std::vector<IfcTokenChunk> _chunks;
         IfcTokenChunk * _cChunk;
         IfcFileStream * _fileStream;
+        bool _ownsChunks;
   };
-  
+
 }
