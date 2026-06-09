@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <vector>
 #include <map>
 #include <unordered_map>
@@ -114,9 +115,8 @@ namespace fuzzybools
 
         Line()
         {
-            static size_t idcounter = 0;
-            idcounter++;
-            globalID = idcounter;
+            static std::atomic<size_t> idcounter{0};
+            globalID = ++idcounter;
         }
 
         //============================================================================================
@@ -254,9 +254,8 @@ namespace fuzzybools
 
         Point()
         {
-            static size_t idcounter = 0;
-            idcounter++;
-            globalID = idcounter;
+            static std::atomic<size_t> idcounter{0};
+            globalID = ++idcounter;
         }
 
         //============================================================================================
@@ -295,9 +294,8 @@ namespace fuzzybools
 
         Plane()
         {
-            static size_t idcounter = 0;
-            idcounter++;
-            globalID = idcounter;
+            static std::atomic<size_t> idcounter{0};
+            globalID = ++idcounter;
         }
 
         //============================================================================================
