@@ -26,7 +26,7 @@ file(GLOB_RECURSE web-ifc-wasm wasm/*.cpp)
 
 # download the external projects and save their paths
 Message("Downloading FastFloat")
-FetchContent_Declare(fastfloat GIT_REPOSITORY "https://github.com/fastfloat/fast_float" GIT_TAG "e8ec8e8f34bd6142efdbf4c714734dcff51ea9ac" SOURCE_SUBDIR "../")
+FetchContent_Declare(fastfloat GIT_REPOSITORY "https://github.com/fastfloat/fast_float" GIT_TAG "34164f547b7df3f5d794ff67e9f885c36819ebfc" SOURCE_SUBDIR "../")
 FetchContent_MakeAvailable(fastfloat)
 FetchContent_GetProperties(fastfloat)
 
