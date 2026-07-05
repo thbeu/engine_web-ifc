@@ -51,7 +51,7 @@ webifc::geometry::IfcGeometryProcessor *webifc::manager::ModelManager::GetGeomet
 {
     if (!IsModelOpen(modelID))
         return {};
-    if (!_geometryProcessors.contains(modelID))
+    if (_geometryProcessors.count(modelID) == 0)
     {
         auto loader = GetIfcLoader(modelID);
         webifc::geometry::IfcGeometryProcessor *processor = new webifc::geometry::IfcGeometryProcessor(*loader, _schemaManager, GetSettings(modelID).CIRCLE_SEGMENTS, GetSettings(modelID).COORDINATE_TO_ORIGIN, GetSettings(modelID).TOLERANCE_PLANE_INTERSECTION, GetSettings(modelID).TOLERANCE_PLANE_DEVIATION, GetSettings(modelID).TOLERANCE_BACK_DEVIATION_DISTANCE, GetSettings(modelID).TOLERANCE_INSIDE_OUTSIDE_PERIMETER, GetSettings(modelID).TOLERANCE_SCALAR_EQUALITY, GetSettings(modelID).PLANE_REFIT_ITERATIONS, GetSettings(modelID).BOOLEAN_UNION_THRESHOLD);
@@ -70,7 +70,10 @@ webifc::parsing::IfcLoader *webifc::manager::ModelManager::GetIfcLoader(uint32_t
 const webifc::manager::LoaderSettings &webifc::manager::ModelManager::GetSettings(uint32_t modelID) const
 {
     if (!IsModelOpen(modelID))
-        return LoaderSettings();
+    {
+        static const LoaderSettings defaultSettings;
+        return defaultSettings;
+    }
     return _settings[modelID];
 }
 

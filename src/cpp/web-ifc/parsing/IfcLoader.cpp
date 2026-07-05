@@ -6,7 +6,7 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
-#include <format>
+#include <iomanip>
 #include <fast_float/fast_float.h>
 #include <spdlog/spdlog.h>
 #include "IfcLoader.h"
@@ -65,7 +65,7 @@ namespace webifc::parsing {
           if (t == IfcTokenType::LABEL) 
           {
             std::string_view schemaName = _tokenStream->ReadString();
-            if (schemaMaps.contains(schemaName)) schemaName = schemaMaps[schemaName];
+            if (schemaMaps.count(schemaName) != 0) schemaName = schemaMaps[schemaName];
             for (size_t i = 0; i < schemas.size();i++)
             {
               if (_schemaManager.GetSchemaName(schemas[i]) == schemaName) return schemas[i];
@@ -300,7 +300,7 @@ namespace webifc::parsing {
 
    bool IfcLoader::IsValidExpressID(const uint32_t expressID) const
    {
-   	 if (expressID == 0 || expressID > _maxExpressId || !_lines.contains(expressID)) return false;
+   	 if (expressID == 0 || expressID > _maxExpressId || _lines.count(expressID) == 0) return false;
      else return true;
    }
 
@@ -360,7 +360,9 @@ namespace webifc::parsing {
 
    void IfcLoader::PushDouble(double input)
    {
-      std::string numberString = std::format("{}", input);
+      std::ostringstream oss;
+      oss << std::setprecision(17) << input;
+      std::string numberString = oss.str();
       size_t eLoc = numberString.find_first_of('e');
       if (eLoc != std::string::npos) numberString[eLoc]='E';
       else if (std::floor(input) == input) numberString+='.';
@@ -744,7 +746,7 @@ namespace webifc::parsing {
 
     uint32_t IfcLoader::GetNextExpressID(uint32_t expressId) const {
       uint32_t currentId = expressId+1;
-      while(!_lines.contains(currentId)) currentId++;
+      while(_lines.count(currentId) == 0) currentId++;
       return currentId;
     }
 

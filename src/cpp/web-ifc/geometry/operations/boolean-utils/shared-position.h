@@ -5,7 +5,6 @@
 #include <map>
 #include <unordered_map>
 #include <set>
-#include <ranges>
 
 #include <glm/glm.hpp>
 
@@ -224,14 +223,15 @@ namespace fuzzybools
 
         //============================================================================================
 
-        auto GetSegments() const
+        std::vector<std::pair<size_t, size_t>> GetSegments() const
         {
-            const auto makeSegments = [&](int i)
+            std::vector<std::pair<size_t, size_t>> segments;
+            segments.reserve(points.size() > 0 ? points.size() - 1 : 0);
+            for (size_t i = 1; i < points.size(); ++i)
             {
-                return std::make_pair(points[i - 1].second, points[i].second);
-            };
-
-            return std::views::iota(size_t(1), points.size()) | std::views::transform(makeSegments);
+                segments.emplace_back(points[i - 1].second, points[i].second);
+            }
+            return segments;
         }
 
         std::vector<std::pair<double, size_t>> points;

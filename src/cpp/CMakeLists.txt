@@ -15,7 +15,7 @@ endif()
 project(web-ifc LANGUAGES CXX)
 enable_testing()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -65,6 +65,10 @@ FetchContent_Declare(stduuid GIT_REPOSITORY "https://github.com/mariusbancila/st
 FetchContent_MakeAvailable(stduuid)
 FetchContent_GetProperties(stduuid)
 
+Message("Downloading Microsoft GSL")
+FetchContent_Declare(microsoft_gsl GIT_REPOSITORY "https://github.com/microsoft/GSL.git" GIT_TAG "a3534567187d2edc428efd3f13466ff75fe5805c" SOURCE_SUBDIR "../")
+FetchContent_MakeAvailable(microsoft_gsl)
+FetchContent_GetProperties(microsoft_gsl)
 
 Message("Downloads Finished")
 
@@ -77,13 +81,14 @@ function(PARAM_SETTER THE_EXECUTABLE)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC $<BUILD_INTERFACE:${earcut_SOURCE_DIR}/include>)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC $<BUILD_INTERFACE:${spdlog_SOURCE_DIR}/include>)
 	target_include_directories(${THE_EXECUTABLE} PUBLIC $<BUILD_INTERFACE:${stduuid_SOURCE_DIR}/include>)
+	target_include_directories(${THE_EXECUTABLE} PUBLIC $<BUILD_INTERFACE:${microsoft_gsl_SOURCE_DIR}/include>)
 
 	if(NOT MSVC)
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "-Wall")
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "-Wextra")
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "-Wpedantic")
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "-pedantic")
-		target_compile_options(${THE_EXECUTABLE} PUBLIC "-std=c++20")
+		target_compile_options(${THE_EXECUTABLE} PUBLIC "-std=c++17")
 
 		if(EMSCRIPTEN)
 			target_compile_options(${THE_EXECUTABLE} PUBLIC "-fexperimental-library")
@@ -95,7 +100,7 @@ function(PARAM_SETTER THE_EXECUTABLE)
 	else()
 		# Force UTF-8 for Windows MSVC
 		target_compile_options(${THE_EXECUTABLE} PUBLIC "/utf-8")
-		target_compile_options(${THE_EXECUTABLE} PUBLIC "-std:c++latest")
+		target_compile_options(${THE_EXECUTABLE} PUBLIC "-std:c++17")
 	endif()
 endfunction()
 
@@ -132,23 +137,27 @@ if(NOT EMSCRIPTEN)
 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/web-ifc>
 	)
 
-	# build parameters for web-ifc-test
-	add_executable(web-ifc-test ${web-ifc-source} "./test/encoding_test.cpp" "./test/main.cpp" "./test/io_helpers.cpp")
-	param_setter(web-ifc-test)
-	target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
+	# Test executables are only built when BUILD_TESTING is enabled.  They rely
+	# on C++17 string_view literals and are not required for the static library.
+	if(BUILD_TESTING)
+		# build parameters for web-ifc-test
+		add_executable(web-ifc-test ${web-ifc-source} "./test/encoding_test.cpp" "./test/main.cpp" "./test/io_helpers.cpp")
+		param_setter(web-ifc-test)
+		target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
 
-	add_test(web-ifc-test web-ifc-test)
-	set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
+		add_test(web-ifc-test web-ifc-test)
+		set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
 
-	# build parameters for web-ifc in testing environment
-	add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
-	param_setter(web-ifc)
-	target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
+		# build parameters for web-ifc in testing environment
+		add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
+		param_setter(web-ifc)
+		target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
 
-	# comment these to prevent debug files being generated
-	if(NOT RELEASE)
-		target_compile_options(web-ifc PUBLIC "-DCSG_DEBUG_OUTPUT")
-		target_compile_options(web-ifc PUBLIC "-DDEBUG_DUMP_SVG")
+		# comment these to prevent debug files being generated
+		if(NOT RELEASE)
+			target_compile_options(web-ifc PUBLIC "-DCSG_DEBUG_OUTPUT")
+			target_compile_options(web-ifc PUBLIC "-DDEBUG_DUMP_SVG")
+		endif()
 	endif()
 
 	# Installation rules
