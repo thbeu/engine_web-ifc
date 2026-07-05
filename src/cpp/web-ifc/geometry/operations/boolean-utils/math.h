@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
+#include <algorithm>
 #include <vector>
 #include <stdio.h>
 
