@@ -6,7 +6,7 @@
 #include <string>
 #include <cmath>
 #include <algorithm>
-#include <format>
+#include <iomanip>
 #include <fast_float/fast_float.h>
 #include <spdlog/spdlog.h>
 #include "IfcLoader.h"
@@ -65,7 +65,7 @@ IFC_SCHEMA IfcLoader::GetSchema() const
       if (t != IfcTokenType::STRING && t != IfcTokenType::LABEL) continue;
       StepBack();
       std::string_view name = GetStringArgument();
-      if (maps.contains(name)) name = maps.at(name);
+      if (maps.count(name) != 0) name = maps.at(name);
       for (IFC_SCHEMA s : _schemaManager.GetAvailableSchemas())
       {
          if (_schemaManager.GetSchemaName(s) == name) return s;
@@ -306,8 +306,8 @@ IFC_SCHEMA IfcLoader::GetSchema() const
    }
    
    bool IfcLoader::IsValidExpressID(const uint32_t expressID) const
-   {  
-   	 if (expressID == 0 || expressID > _maxExpressId || !_lines.contains(expressID)) return false;
+   {
+   	 if (expressID == 0 || expressID > _maxExpressId || _lines.count(expressID) == 0) return false;
      else return true;
    }
    
@@ -361,8 +361,10 @@ IFC_SCHEMA IfcLoader::GetSchema() const
    }
 
    void IfcLoader::PushDouble(double input)
-   {             
-      std::string numberString = std::format("{}", input);
+   {
+      std::ostringstream oss;
+      oss << std::setprecision(17) << input;
+      std::string numberString = oss.str();
       size_t eLoc = numberString.find_first_of('e');
       if (eLoc != std::string::npos) numberString[eLoc]='E';
       else if (std::floor(input) == input) numberString+='.';
@@ -443,7 +445,8 @@ IFC_SCHEMA IfcLoader::GetSchema() const
       ++_revision;
       const auto lineIt = _lines.find(expressID);
       if (lineIt == _lines.end()) return;
-      std::erase(_ifcTypeToExpressID[lineIt->second.ifcType], expressID);
+      auto& expressIDs = _ifcTypeToExpressID[lineIt->second.ifcType];
+      expressIDs.erase(std::remove(expressIDs.begin(), expressIDs.end(), expressID), expressIDs.end());
       _lines.erase(lineIt);
   }
   
@@ -800,7 +803,7 @@ IFC_SCHEMA IfcLoader::GetSchema() const
 
     uint32_t IfcLoader::GetNextExpressID(uint32_t expressId) const {
       uint32_t currentId = expressId+1;
-      while(!_lines.contains(currentId)) currentId++;
+      while(_lines.count(currentId) == 0) currentId++;
       return currentId;
     }
 

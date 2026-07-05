@@ -4,6 +4,7 @@
 
 #include <spdlog/spdlog.h>
 #include <iomanip>
+#include <sstream>
 #include "IfcGeometryLoader.h"
 #include "operations/curve-utils.h"
 #include "operations/geometryutils.h"
@@ -4250,7 +4251,7 @@ namespace webifc::geometry
       ~PlacementScope() { active.erase(id); }
     } scope{_activePlacements, expressID};
 
-    if (_cache.GetExpressIDToPlacement().contains(expressID))
+    if (_cache.GetExpressIDToPlacement().count(expressID) != 0)
     {
       return _cache.GetExpressIDToPlacement()[expressID];
     }

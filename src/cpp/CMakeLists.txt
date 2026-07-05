@@ -16,7 +16,7 @@ endif()
 project(web-ifc LANGUAGES CXX)
 enable_testing()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
@@ -72,6 +72,12 @@ Message("Downloading unordered_dense")
 FetchContent_Declare(unordered_dense GIT_REPOSITORY "https://github.com/martinus/unordered_dense" GIT_TAG "7c58a8b7a48e790fe72f6508eb3b46317cbba9d5" SOURCE_SUBDIR "../")
 FetchContent_MakeAvailable(unordered_dense)
 
+# stduuid pulls in gsl/span when std::span is unavailable (C++17 / VS 2017)
+Message("Downloading Microsoft GSL")
+FetchContent_Declare(microsoft_gsl GIT_REPOSITORY "https://github.com/microsoft/GSL.git" GIT_TAG "a3534567187d2edc428efd3f13466ff75fe5805c" SOURCE_SUBDIR "../")
+FetchContent_MakeAvailable(microsoft_gsl)
+FetchContent_GetProperties(microsoft_gsl)
+
 Message("Downloads Finished")
 
 function(PARAM_SETTER THE_EXECUTABLE)
@@ -88,6 +94,7 @@ function(PARAM_SETTER THE_EXECUTABLE)
 		$<BUILD_INTERFACE:${spdlog_SOURCE_DIR}/include>
 		$<BUILD_INTERFACE:${stduuid_SOURCE_DIR}/include>
 		$<BUILD_INTERFACE:${unordered_dense_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${microsoft_gsl_SOURCE_DIR}/include>
 	)
 
 	if(NOT MSVC)
@@ -218,6 +225,20 @@ if(NOT EMSCRIPTEN)
 	add_library(web-ifc-library ${web-ifc-source})
 	param_setter(web-ifc-library)
 
+	# Expose the dependency headers that are needed by web-ifc's public headers
+	# (ankerl/unordered_dense.h is included by IfcLoader.h) or directly by
+	# in-tree consumers such as the wlx_ifc plugin (spdlog, gsl).
+	target_include_directories(web-ifc-library PUBLIC
+		$<BUILD_INTERFACE:${tinynurbs_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${fastfloat_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${cdt_SOURCE_DIR}/CDT/include>
+		$<BUILD_INTERFACE:${earcut_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${spdlog_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${stduuid_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${unordered_dense_SOURCE_DIR}/include>
+		$<BUILD_INTERFACE:${microsoft_gsl_SOURCE_DIR}/include>
+	)
+
 	# Export symbols on Windows (Needed for shared library)
 	set_target_properties(web-ifc-library PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
@@ -229,52 +250,56 @@ if(NOT EMSCRIPTEN)
 		$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/web-ifc>
 	)
 
-	# build parameters for web-ifc-test
-	add_executable(web-ifc-test ${web-ifc-source}
-		"./test/main.cpp"
-		"./test/io_helpers.cpp"
-		"./test/encoding_test.cpp"
-		"./test/get_schema_test.cpp"
-		"./test/issue65_material_test.cpp"
-		"./test/malformed_input_test.cpp"
-		"./test/surface_curve_swept_area_test.cpp"
-		"./test/touching_face_bounds_test.cpp"
-	)
-	param_setter(web-ifc-test)
-	target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
-	target_compile_definitions(web-ifc-test PRIVATE WEB_IFC_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/functional/fixtures")
+	# Test executables are only built when BUILD_TESTING is enabled.  They rely
+	# on C++17 string_view literals and are not required for the static library.
+	if(BUILD_TESTING)
+		# build parameters for web-ifc-test
+		add_executable(web-ifc-test ${web-ifc-source}
+			"./test/main.cpp"
+			"./test/io_helpers.cpp"
+			"./test/encoding_test.cpp"
+			"./test/get_schema_test.cpp"
+			"./test/issue65_material_test.cpp"
+			"./test/malformed_input_test.cpp"
+			"./test/surface_curve_swept_area_test.cpp"
+			"./test/touching_face_bounds_test.cpp"
+		)
+		param_setter(web-ifc-test)
+		target_include_directories(web-ifc-test PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
+		target_compile_definitions(web-ifc-test PRIVATE WEB_IFC_TEST_FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../../tests/functional/fixtures")
 
-	add_test(web-ifc-test web-ifc-test)
-	set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
+		add_test(web-ifc-test web-ifc-test)
+		set_tests_properties(web-ifc-test PROPERTIES LABELS "web-ifc")
 
-	# brep kernel bench (native only), built only with the kernel: default builds are unchanged.
-	if(BREP_HAVE_KERNEL)
-		file(GLOB brep-source brep/*.cpp)
-		list(FILTER brep-source EXCLUDE REGEX ".*(bench_main|_test)\\.cpp$")
-		add_executable(brep-bench ${brep-source} "./brep/bench_main.cpp")
-		target_link_libraries(brep-bench web-ifc-library)
-		if(WIN32)
-			target_link_libraries(brep-bench winmm)
+		# brep kernel bench (native only), built only with the kernel: default builds are unchanged.
+		if(BREP_HAVE_KERNEL)
+			file(GLOB brep-source brep/*.cpp)
+			list(FILTER brep-source EXCLUDE REGEX ".*(bench_main|_test)\\.cpp$")
+			add_executable(brep-bench ${brep-source} "./brep/bench_main.cpp")
+			target_link_libraries(brep-bench web-ifc-library)
+			if(WIN32)
+				target_link_libraries(brep-bench winmm)
+			endif()
+			param_setter(brep-bench)
+			# JS never fuses multiply-adds; the kernel's exact predicates rely on that.
+			target_compile_options(brep-bench PUBLIC "-ffp-contract=off" "-g")
+			target_compile_definitions(brep-bench PUBLIC BREP_HAVE_KERNEL)
+			if(BREP_MIMALLOC)
+				target_compile_definitions(brep-bench PUBLIC BREP_MIMALLOC)
+				target_include_directories(brep-bench PUBLIC "${BREP_MIMALLOC}/include")
+				target_link_libraries(brep-bench "${BREP_MIMALLOC}/../mimalloc-static.o")
+			endif()
 		endif()
-		param_setter(brep-bench)
-		# JS never fuses multiply-adds; the kernel's exact predicates rely on that.
-		target_compile_options(brep-bench PUBLIC "-ffp-contract=off" "-g")
-		target_compile_definitions(brep-bench PUBLIC BREP_HAVE_KERNEL)
-		if(BREP_MIMALLOC)
-			target_compile_definitions(brep-bench PUBLIC BREP_MIMALLOC)
-			target_include_directories(brep-bench PUBLIC "${BREP_MIMALLOC}/include")
-			target_link_libraries(brep-bench "${BREP_MIMALLOC}/../mimalloc-static.o")
+
+		# build parameters for web-ifc in testing environment
+		add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
+		param_setter(web-ifc)
+		target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
+
+		# comment these to prevent debug files being generated
+		if(NOT RELEASE)
+			target_compile_options(web-ifc PRIVATE -DCSG_DEBUG_OUTPUT -DDEBUG_DUMP_SVG)
 		endif()
-	endif()
-
-	# build parameters for web-ifc in testing environment
-	add_executable(web-ifc ${web-ifc-source} "./test/web-ifc-test.cpp" "./test/io_helpers.cpp")
-	param_setter(web-ifc)
-	target_include_directories(web-ifc PUBLIC ${tinycpptest_SOURCE_DIR}/Sources)
-
-	# comment these to prevent debug files being generated
-	if(NOT RELEASE)
-		target_compile_options(web-ifc PRIVATE -DCSG_DEBUG_OUTPUT -DDEBUG_DUMP_SVG)
 	endif()
 
 	# Installation rules
