@@ -3556,6 +3556,14 @@ namespace webifc::geometry
           profile.curve.points[i] = transformation * glm::dvec3(profile.curve.points[i].x, profile.curve.points[i].y, 1);
           profile.curve.points[i].z = 0;
         }
+        for (auto &hole : profile.holes)
+        {
+          for (uint32_t i = 0; i < hole.points.size(); i++)
+          {
+            hole.points[i] = transformation * glm::dvec3(hole.points[i].x, hole.points[i].y, 1);
+            hole.points[i].z = 0;
+          }
+        }
       }
       else
       {
@@ -3564,6 +3572,14 @@ namespace webifc::geometry
           for (uint32_t i = 0; i < profile.profiles[j].curve.points.size(); i++)
           {
             profile.profiles[j].curve.points[i] = transformation * glm::dvec3(profile.profiles[j].curve.points[i].x, profile.profiles[j].curve.points[i].y, 1);
+          }
+          for (auto &hole : profile.profiles[j].holes)
+          {
+            for (uint32_t i = 0; i < hole.points.size(); i++)
+            {
+              hole.points[i] = transformation * glm::dvec3(hole.points[i].x, hole.points[i].y, 1);
+              hole.points[i].z = 0;
+            }
           }
         }
       }
