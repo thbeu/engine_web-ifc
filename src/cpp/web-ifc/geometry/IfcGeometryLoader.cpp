@@ -1354,7 +1354,12 @@ namespace webifc::geometry
             // Check connection and reverse if needed
             auto& ec = edgeCurve.points; // referència per brevetat
             if (!ec.empty()) {
-                if (nearEqual(curve.points.back(), ec.back())) {
+                if (nearEqual(curve.points.back(), ec.front())) {
+                    // Normal continuation: the edge starts where the loop currently ends.
+                    // This also covers the closing edge of a correctly-ordered loop, which
+                    // ends at the loop start point and must not trigger a reversal.
+                }
+                else if (nearEqual(curve.points.back(), ec.back())) {
                     std::reverse(ec.begin(), ec.end());
                 }
                 else if (nearEqual(curve.points.front(), ec.front())) {
