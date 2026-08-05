@@ -942,8 +942,6 @@ namespace webifc::geometry
             }
             case schema::IFCREVOLVEDAREASOLID:
             {
-                IfcComposedMesh mesh;
-
                 _loader.MoveToArgumentOffset(expressID, 0);
                 uint32_t profileID = _loader.GetRefArgument();
                 uint32_t placementID = _loader.GetRefArgument();
@@ -957,6 +955,11 @@ namespace webifc::geometry
                 bool closed = false;
 
                 glm::dvec3 pos = _geometryLoader.GetAxis1Placement(axis1PlacementID)[1];
+
+                // The directrix ring must pass through the profile center, which is at the
+                // origin of the sweep frame. pos is a point on the revolution axis, so drop
+                // its component along the axis to center the ring on the profile center.
+                pos -= glm::dot(pos, axis) * axis;
 
                 IfcCurve directrix = BuildArc(_cache.GetLinearScalingFactor(), pos, axis, angle, _settings._circleSegments);
                 if (glm::distance(directrix.points[0], directrix.points[directrix.points.size() - 1]) < EPS_BIG)
