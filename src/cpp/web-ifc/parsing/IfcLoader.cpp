@@ -62,7 +62,7 @@ namespace webifc::parsing {
       while (!_tokenStream->IsAtEnd()) {
           IfcTokenType t = static_cast<IfcTokenType>(_tokenStream->Read<char>());
           if (t == IfcTokenType::LINE_END) break;
-          if (t == IfcTokenType::LABEL) 
+          if (t == IfcTokenType::LABEL)
           {
             std::string_view schemaName = _tokenStream->ReadString();
             if (schemaMaps.count(schemaName) != 0) schemaName = schemaMaps[schemaName];
