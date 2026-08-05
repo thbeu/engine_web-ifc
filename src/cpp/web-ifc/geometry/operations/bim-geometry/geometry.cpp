@@ -1,5 +1,6 @@
 #include <vector>
 #include <algorithm>
+#include <cmath>
 #include <glm/glm.hpp>
 #include "geometry.h"
 #include "epsilons.h"
@@ -9,6 +10,33 @@
 #pragma once
 namespace bimGeometry
 {
+    // Cells are wider than the equality tolerance so that any two planes that
+    // IsEqualTo() considers equal are guaranteed to share a neighbouring cell.
+    constexpr double PLANE_CELL_WIDTH = 2.0 * toleranceVectorEquality;
+
+    uint64_t Geometry::PlaneKey(long long kx, long long ky, long long kz, long long kd)
+    {
+        uint64_t h = 14695981039346656037ULL;
+        h ^= (uint64_t)(kx + 1024); h *= 1099511628211ULL;
+        h ^= (uint64_t)(ky + 1024); h *= 1099511628211ULL;
+        h ^= (uint64_t)(kz + 1024); h *= 1099511628211ULL;
+        h ^= (uint64_t)(kd + 4096); h *= 1099511628211ULL;
+        return h;
+    }
+
+    void Geometry::RebuildPlaneBuckets()
+    {
+        _planeBuckets.clear();
+        auto comp = [](double v) -> long long { return (long long)std::floor(v / PLANE_CELL_WIDTH); };
+        for (size_t i = 0; i < planes.size(); i++)
+        {
+            const Plane &p = planes[i];
+            uint64_t key = PlaneKey(comp(p.normal.x), comp(p.normal.y), comp(p.normal.z), comp(p.distance));
+            _planeBuckets[key].push_back((uint32_t)i);
+        }
+        _planeBucketsUpTo = planes.size();
+    }
+
     void Geometry::AddPoint(glm::dvec4 &pt, glm::dvec3 &n)
     {
         glm::dvec3 p = pt;
@@ -99,11 +127,43 @@ namespace bimGeometry
 
     size_t Geometry::AddPlane(const glm::dvec3 &normal, double d)
     {
-        for (auto &plane : planes)
+        // Planes may have been appended directly (e.g. AddGeometry) since the
+        // index was last built — rebuild lazily if the coverage is stale.
+        if (_planeBucketsUpTo != planes.size())
         {
-            if (plane.IsEqualTo(normal, d))
+            RebuildPlaneBuckets();
+        }
+
+        auto comp = [](double v) -> long long { return (long long)std::floor(v / PLANE_CELL_WIDTH); };
+        long long kx = comp(normal.x);
+        long long ky = comp(normal.y);
+        long long kz = comp(normal.z);
+        long long kd = comp(d);
+
+        // The cell is wider than the equality tolerance, so any plane within
+        // tolerance of this one must fall into one of the neighbouring cells.
+        for (long long dx = -1; dx <= 1; dx++)
+        {
+            for (long long dy = -1; dy <= 1; dy++)
             {
-                return plane.id;
+                for (long long dz = -1; dz <= 1; dz++)
+                {
+                    for (long long dd = -1; dd <= 1; dd++)
+                    {
+                        auto it = _planeBuckets.find(PlaneKey(kx + dx, ky + dy, kz + dz, kd + dd));
+                        if (it == _planeBuckets.end())
+                        {
+                            continue;
+                        }
+                        for (uint32_t id : it->second)
+                        {
+                            if (planes[id].IsEqualTo(normal, d))
+                            {
+                                return planes[id].id;
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -113,6 +173,8 @@ namespace bimGeometry
         p.distance = d;
 
         planes.push_back(p);
+        _planeBuckets[PlaneKey(kx, ky, kz, kd)].push_back(p.id);
+        _planeBucketsUpTo = planes.size();
 
         return p.id;
     }

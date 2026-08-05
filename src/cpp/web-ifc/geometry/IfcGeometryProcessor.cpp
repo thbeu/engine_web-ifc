@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 #include <spdlog/spdlog.h>
+#include <chrono>
 
 #if defined(DEBUG_DUMP_SVG) || defined(DUMP_CSG_MESHES)
 #include "../../test/io_helpers.h"
@@ -2098,11 +2099,32 @@ namespace webifc::geometry
         spdlog::debug("[BoolProcess({})]");
         IfcGeometry finalResult;
 
+        // Boolean operations grow at least quadratically with the number of faces
+        // of their operands. Polygonal face-set exports (e.g. Revit waffle/coffered
+        // slabs) routinely carry tens of thousands of faces, in which case a single
+        // boolean never terminates in a usable time — and even small operands can be
+        // pathological when their surfaces exactly coincide (coffers punched out of a
+        // slab that already contains the matching holes). A preflight bound on raw
+        // face count alone is not reliable (a large coplanar faceset can convert quickly,
+        // a small one with many distinct planes cannot), so we bound the operation with
+        // a per-pair product guard below and, crucially, a measured time budget that is
+        // independent of face count. Any skipped boolean keeps the first operand,
+        // mirroring the "timeout and skip" behaviour adopted by other IFC viewers.
+        const auto boolStart = std::chrono::steady_clock::now();
+        constexpr double MAX_BOOLEAN_SECONDS = 8.0;
+
         for (auto &firstGeom : firstGeoms)
         {
             IfcGeometry firstOperator = firstGeom;
             for (auto &secondGeom : secondGeoms)
             {
+                if (std::chrono::duration<double>(std::chrono::steady_clock::now() - boolStart).count() > MAX_BOOLEAN_SECONDS)
+                {
+                    spdlog::warn("[BoolProcess()] boolean op {} timed out after {}s; keeping partially processed result",
+                                 op, MAX_BOOLEAN_SECONDS);
+                    return firstOperator;
+                }
+
                 if (secondGeom.numFaces == 0)
                 {
                     spdlog::error("[BoolProcess()] bool aborted due to empty source or target");
@@ -2119,6 +2141,19 @@ namespace webifc::geometry
                     // bail out because we will get strange meshes
                     // if this happens, probably there's an issue parsing the mesh that occurred earlier
                     break;
+                }
+
+                // Per-pair guard: two large overlapping operands are pathological
+                // in the classic CSG engine regardless of conditioning (each triangle
+                // is matched against the other shell). Skip such pairs and keep the
+                // first operand.
+                constexpr uint64_t MAX_BOOLEAN_FACE_PAIRS = 100000000ULL; // 1e8
+                uint64_t booleanFacePairs = (uint64_t)firstOperator.numFaces * (uint64_t)secondGeom.numFaces;
+                if (booleanFacePairs > MAX_BOOLEAN_FACE_PAIRS)
+                {
+                    spdlog::warn("[BoolProcess()] boolean op skipped: {} faces x {} faces = {} face-pairs exceeds the {} limit; keeping first operand",
+                                 firstOperator.numFaces, secondGeom.numFaces, booleanFacePairs, (uint64_t)MAX_BOOLEAN_FACE_PAIRS);
+                    continue;
                 }
 
                 IfcGeometry secondOperator;
