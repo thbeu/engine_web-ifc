@@ -951,33 +951,23 @@ namespace webifc::geometry
                 IfcProfile profile = _geometryLoader.GetProfile(profileID);
                 glm::dmat4 placement = _geometryLoader.GetLocalPlacement(placementID);
                 glm::dvec3 axis = _geometryLoader.GetAxis1Placement(axis1PlacementID)[0];
-
-                bool closed = false;
-
                 glm::dvec3 pos = _geometryLoader.GetAxis1Placement(axis1PlacementID)[1];
-
-                // The directrix ring must pass through the profile center, which is at the
-                // origin of the sweep frame. pos is a point on the revolution axis, so drop
-                // its component along the axis to center the ring on the profile center.
-                pos -= glm::dot(pos, axis) * axis;
-
-                IfcCurve directrix = BuildArc(_cache.GetLinearScalingFactor(), pos, axis, angle, _settings._circleSegments);
-                if (glm::distance(directrix.points[0], directrix.points[directrix.points.size() - 1]) < EPS_BIG)
-                {
-                    closed = true;
-                }
 
                 IfcGeometry geom;
 
                 if (!profile.isComposite)
                 {
-                    geom = Sweep(_cache.GetLinearScalingFactor(), closed, profile, directrix, axis, false);
+                    if (profile.curve.points.empty())
+                    {
+                        return mesh;
+                    }
+                    geom = Revolve(profile, axis, pos, angle, _settings._circleSegments);
                 }
                 else
                 {
                     for (uint32_t i = 0; i < profile.profiles.size(); i++)
                     {
-                        IfcGeometry geom_t = Sweep(_cache.GetLinearScalingFactor(), closed, profile.profiles[i], directrix, axis, false, false);
+                        IfcGeometry geom_t = Revolve(profile.profiles[i], axis, pos, angle, _settings._circleSegments);
                         geom.AddPart(geom_t);
                         geom.AddGeometry(geom_t);
                     }

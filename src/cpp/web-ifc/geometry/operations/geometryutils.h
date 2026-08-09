@@ -14,6 +14,9 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
+#include <tuple>
+#include <utility>
 #include <spdlog/spdlog.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include "../representation/geometry.h"
@@ -116,6 +119,340 @@ namespace webifc::geometry
 		}
 
 		return ToIfcGeometry(bimGeometry::SweepCircular(scaling, closed, profile_vector, radius, directrix_vector, initialDirectrixNormal, rotate90));
+	}
+
+	//! Revolves a profile around an arbitrary axis by rotating each profile point
+	//! by the given angle. Unlike a sweep along a directrix, this always produces
+	//! geometry, even when the axis passes through the profile origin (where the
+	//! directrix arc would degenerate to a point).
+	inline IfcGeometry Revolve(const IfcProfile &profile, const glm::dvec3 &axisDir, const glm::dvec3 &axisPos, const double angleRad, const uint16_t circleSegments)
+	{
+		IfcGeometry geom;
+
+		if (profile.curve.points.empty())
+		{
+			return geom;
+		}
+
+		glm::dvec3 axis = glm::normalize(axisDir);
+
+		std::vector<std::vector<glm::dvec3>> rings;
+		rings.push_back(profile.curve.points);
+		for (const auto &hole : profile.holes)
+		{
+			if (!hole.points.empty())
+			{
+				// holes are wound opposite to the outer contour in IFC
+				rings.push_back(hole.points);
+			}
+		}
+
+		// make sure the rings are closed, otherwise the seam of the side surface is open
+		for (auto &ring : rings)
+		{
+			if (ring.size() > 1 && glm::distance(ring.front(), ring.back()) > EPS_BIG2)
+			{
+				ring.push_back(ring.front());
+			}
+		}
+
+		double sweepAngle = std::fabs(angleRad);
+		bool closed = sweepAngle >= 2.0 * CONST_PI - EPS_BIG;
+
+		uint32_t segments = std::max<uint32_t>(2, circleSegments);
+
+		// precompute the profile rings for every angular step
+		std::vector<std::vector<std::vector<glm::dvec3>>> rotated(segments + 1);
+		for (uint32_t k = 0; k <= segments; k++)
+		{
+			double theta = angleRad * (double)k / (double)segments;
+			double cosT = std::cos(theta);
+			double sinT = std::sin(theta);
+
+			rotated[k].resize(rings.size());
+			for (size_t r = 0; r < rings.size(); r++)
+			{
+				rotated[k][r].reserve(rings[r].size());
+				for (const auto &pt : rings[r])
+				{
+					glm::dvec3 v = pt - axisPos;
+					glm::dvec3 parallel = glm::dot(v, axis) * axis;
+					glm::dvec3 perp = v - parallel;
+					glm::dvec3 twisted = glm::cross(axis, perp);
+					rotated[k][r].push_back(axisPos + parallel + cosT * perp + sinT * twisted);
+				}
+			}
+		}
+
+		// Assemble the triangle soup (side surface + caps) along with an explicit
+		// vertex set, then enforce a globally consistent winding by flood-filling
+		// orientation across shared edges. This keeps the winding correct regardless
+		// of the profile ring ordering or the position of the axis relative to the
+		// profile (local outward tests are unreliable because side faces that run
+		// parallel to the axis have normals perpendicular to the "radial" direction).
+		std::vector<glm::dvec3> positions;
+		std::map<std::tuple<double, double, double>, uint32_t> positionIndex;
+		auto GetPointIndex = [&](const glm::dvec3 &pt) -> uint32_t
+		{
+			std::tuple<double, double, double> key(pt.x, pt.y, pt.z);
+			auto it = positionIndex.find(key);
+			if (it != positionIndex.end())
+			{
+				return it->second;
+			}
+			uint32_t index = static_cast<uint32_t>(positions.size());
+			positions.push_back(pt);
+			positionIndex[key] = index;
+			return index;
+		};
+
+		struct Triangle
+		{
+			uint32_t v[3];
+			bool anchored; // true for cap triangles whose winding is already fixed
+		};
+		std::vector<Triangle> triangles;
+
+		auto AddTriangle = [&](const glm::dvec3 &a, const glm::dvec3 &b, const glm::dvec3 &c, bool anchored) -> void
+		{
+			Triangle t;
+			t.v[0] = GetPointIndex(a);
+			t.v[1] = GetPointIndex(b);
+			t.v[2] = GetPointIndex(c);
+			t.anchored = anchored;
+			triangles.push_back(t);
+		};
+
+		// side surface between consecutive angular steps
+		for (uint32_t k = 0; k < segments; k++)
+		{
+			for (size_t r = 0; r < rotated[k].size(); r++)
+			{
+				const auto &ring1 = rotated[k][r];
+				const auto &ring2 = rotated[k + 1][r];
+				for (size_t j = 1; j < ring1.size(); j++)
+				{
+					AddTriangle(ring2[j - 1], ring1[j - 0], ring1[j - 1], false);
+					AddTriangle(ring2[j - 1], ring2[j - 0], ring1[j - 0], false);
+				}
+			}
+		}
+
+		// end caps for non-closed revolutions
+		if (!closed)
+		{
+			// direction the profile moves as the angle increases, measured at the first
+			// non-degenerate profile point
+			auto motion = [&](const std::vector<glm::dvec3> &ring) -> glm::dvec3
+			{
+				for (const auto &pt : ring)
+				{
+					glm::dvec3 v = glm::cross(axis, pt - axisPos);
+					if (glm::length(v) > EPS_BIG2)
+					{
+						return glm::normalize(v);
+					}
+				}
+				return glm::dvec3(0, 0, 1);
+			};
+
+			auto AddCap = [&](const std::vector<std::vector<glm::dvec3>> &ringSet, const glm::dvec3 &normal)
+			{
+				std::vector<std::vector<bimGeometry::Point>> polygon(ringSet.size());
+				std::vector<glm::dvec3> flatPts;
+				for (size_t r = 0; r < ringSet.size(); r++)
+				{
+					const auto &ring = ringSet[r];
+					for (const auto &pt : ring)
+					{
+						flatPts.push_back(pt);
+						polygon[r].push_back(bimGeometry::Point{pt.x, pt.y, pt.z});
+					}
+				}
+
+				bimGeometry::Projection proj = bimGeometry::bestProjection(polygon[0]);
+				auto polygon2D = bimGeometry::projectTo2D(polygon, proj);
+				std::vector<uint32_t> indices = mapbox::earcut<uint32_t>(polygon2D);
+
+				// stabilize the earcut winding so the first emitted triangle already faces
+				// the requested normal; the flood-fill below anchors on that winding. The
+				// anchor does not need to be strictly outward-facing: the final global
+				// sense is fixed later by the sign of the total signed volume.
+				bool flipWinding = false;
+				if (indices.size() >= 3)
+				{
+					glm::dvec3 a = flatPts[indices[0]];
+					glm::dvec3 b = flatPts[indices[1]];
+					glm::dvec3 c = flatPts[indices[2]];
+					if (glm::dot(glm::cross(b - a, c - a), normal) < 0)
+					{
+						flipWinding = true;
+					}
+				}
+
+				for (size_t i = 0; i < indices.size(); i += 3)
+				{
+					uint32_t i0 = indices[i + 0];
+					uint32_t i1 = indices[i + 1];
+					uint32_t i2 = indices[i + 2];
+					if (flipWinding)
+					{
+						AddTriangle(flatPts[i0], flatPts[i2], flatPts[i1], true);
+					}
+					else
+					{
+						AddTriangle(flatPts[i0], flatPts[i1], flatPts[i2], true);
+					}
+				}
+			};
+
+			AddCap(rotated[0], -motion(rotated[0][0]));
+			AddCap(rotated[segments], motion(rotated[segments][0]));
+		}
+
+		// shared edges: unordered edge -> list of triangle indices containing it
+		std::map<std::pair<uint32_t, uint32_t>, std::vector<uint32_t>> edges;
+		for (uint32_t t = 0; t < triangles.size(); t++)
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				uint32_t a = triangles[t].v[i];
+				uint32_t b = triangles[t].v[(i + 1) % 3];
+				if (a > b)
+				{
+					std::swap(a, b);
+				}
+				edges[{a, b}].push_back(t);
+			}
+		}
+
+		// orient[t] = +1 emit the triangle as stored, -1 emit it reversed
+		std::vector<int> orient(triangles.size(), 0);
+		for (uint32_t t = 0; t < triangles.size(); t++)
+		{
+			if (triangles[t].anchored)
+			{
+				orient[t] = 1;
+			}
+		}
+
+		std::vector<uint32_t> stack;
+		for (uint32_t t = 0; t < triangles.size(); t++)
+		{
+			if (orient[t] != 0)
+			{
+				stack.push_back(t);
+			}
+		}
+
+		while (!stack.empty())
+		{
+			uint32_t t = stack.back();
+			stack.pop_back();
+
+			// actual (possibly reversed) vertex order of the current triangle
+			uint32_t x0 = triangles[t].v[0];
+			uint32_t x1 = triangles[t].v[1];
+			uint32_t x2 = triangles[t].v[2];
+			if (orient[t] < 0)
+			{
+				std::swap(x0, x2);
+			}
+
+			std::pair<uint32_t, uint32_t> edgePairs[3] = {
+				{x0, x1}, {x1, x2}, {x2, x0}};
+			for (int i = 0; i < 3; i++)
+			{
+				uint32_t ea = edgePairs[i].first;
+				uint32_t eb = edgePairs[i].second;
+				std::pair<uint32_t, uint32_t> key = (ea < eb) ? std::pair<uint32_t, uint32_t>(ea, eb) : std::pair<uint32_t, uint32_t>(eb, ea);
+				auto it = edges.find(key);
+				if (it == edges.end())
+				{
+					continue;
+				}
+				for (uint32_t nt : it->second)
+				{
+					if (nt == t || orient[nt] != 0)
+					{
+						continue;
+					}
+					// determine whether the neighbour traverses this edge in the same
+					// direction as us in its stored order; if so it must be reversed
+					int o = 1;
+					for (int j = 0; j < 3 && o != -1; j++)
+					{
+						if (triangles[nt].v[j] == ea && triangles[nt].v[(j + 1) % 3] == eb)
+						{
+							o = -1;
+						}
+					}
+					orient[nt] = o;
+					stack.push_back(nt);
+				}
+			}
+		}
+
+		// any triangle that stayed unassigned (should not happen for a closed
+		// revolve) defaults to its stored winding
+		for (uint32_t t = 0; t < triangles.size(); t++)
+		{
+			if (orient[t] == 0)
+			{
+				orient[t] = 1;
+			}
+		}
+
+		// the flood fill guarantees a locally consistent (closed) winding, but not
+		// its global sense. Fix the global sense with the sign of the total signed
+		// volume (divergence theorem): for a consistently wound closed surface this
+		// equals +/- the enclosed volume independent of the reference point.
+		if (!triangles.empty())
+		{
+			glm::dvec3 centroid(0);
+			for (const auto &pt : positions)
+			{
+				centroid += pt;
+			}
+			centroid /= static_cast<double>(positions.size());
+
+			double totalVolume = 0;
+			for (size_t t = 0; t < triangles.size(); t++)
+			{
+				glm::dvec3 a = positions[triangles[t].v[0]] - centroid;
+				glm::dvec3 b = positions[triangles[t].v[1]] - centroid;
+				glm::dvec3 c = positions[triangles[t].v[2]] - centroid;
+				if (orient[t] < 0)
+				{
+					std::swap(b, c);
+				}
+				totalVolume += glm::dot(a, glm::cross(b, c));
+			}
+			if (totalVolume < 0)
+			{
+				for (auto &o : orient)
+				{
+					o = -o;
+				}
+			}
+		}
+
+		for (size_t t = 0; t < triangles.size(); t++)
+		{
+			const glm::dvec3 &a = positions[triangles[t].v[0]];
+			const glm::dvec3 &b = positions[triangles[t].v[1]];
+			const glm::dvec3 &c = positions[triangles[t].v[2]];
+			if (orient[t] < 0)
+			{
+				geom.AddFace(a, c, b);
+			}
+			else
+			{
+				geom.AddFace(a, b, c);
+			}
+		}
+
+		return geom;
 	}
 
 	inline bool computeSafeNormal(const glm::dvec3 v1, const glm::dvec3 v2, const glm::dvec3 v3, glm::dvec3 &normal, double eps = 0)

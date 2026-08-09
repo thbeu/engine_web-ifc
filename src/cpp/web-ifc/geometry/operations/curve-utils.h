@@ -497,46 +497,4 @@ inline IfcCurve Build3DArc3Pt(const glm::dvec3 &p1, const glm::dvec3 &p2, const 
 		c.points = temp.points;
 		return c;
 	}
-
-	inline IfcCurve BuildArc(double scale, const glm::dvec3 &pos, const glm::dvec3 &axis, double angleRad,uint16_t _circleSegments)
-	{
-		
-		spdlog::debug("[BuildArc({})]");
-		IfcCurve curve;
-
-		// project pos onto axis
-
-		double pdota = glm::dot(axis, pos);
-		glm::dvec3 pproja = pdota * axis;
-
-		glm::dvec3 right = -(pos - pproja);
-
-		if(glm::length(right) == 0)
-		{
-			right = glm::dvec3(EPS_BIG2, 0, 0);
-			glm::dvec3 up = glm::cross(axis, right);
-
-			auto curve2D = GetEllipseCurve(1, 1, _circleSegments, glm::dmat3(1), 0, angleRad, true, true);
-
-			for (auto &pt2D : curve2D.points)
-			{
-				glm::dvec3 pt3D = pos + pt2D.x * right + pt2D.y * up;
-				curve.Add(pt3D);
-			}	
-		}
-		else
-		{
-			glm::dvec3 up = glm::cross(axis, right);
-
-			auto curve2D = GetEllipseCurve(1, 1, _circleSegments, glm::dmat3(1), 0, angleRad, true);
-
-			for (auto &pt2D : curve2D.points)
-			{
-				glm::dvec3 pt3D = pos + pt2D.x * right + pt2D.y * up;
-				curve.Add(pt3D);
-			}
-		}
-
-		return curve;
-	}
 }

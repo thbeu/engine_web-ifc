@@ -50,7 +50,7 @@ namespace webifc::cache
     double _squaredScalingFactor = 1;
     double _cubicScalingFactor = 1;
     double _angularScalingFactor = 1;
-    std::string _angleUnits;
+    std::string _angleUnits = "RADIAN";
     std::vector<geometry::IfcCurve> _localCurvesList;
     std::vector<uint32_t> _localcurvesIndices;
     std::unordered_map<uint32_t, glm::dvec3> _cartesianPoint3DCache;
