@@ -991,6 +991,8 @@ namespace webifc::geometry
                 uint32_t placementID = _loader.GetOptionalRefArgument();
                 uint32_t directionID = _loader.GetRefArgument();
                 double depth = _loader.GetDoubleArgument();
+                const bool tapered = _loader.GetLineType(expressID) == schema::IFCEXTRUDEDAREASOLIDTAPERED;
+                const uint32_t endProfileID = tapered ? _loader.GetRefArgument() : 0;
 
                 auto lineProfileType = _loader.GetLineType(profileID);
                 IfcProfile profile = _geometryLoader.GetProfile(profileID);
@@ -1029,7 +1031,11 @@ namespace webifc::geometry
 
                 IfcGeometry geom;
 
-                if (!profile.isComposite)
+                if (tapered)
+                {
+                    geom = ExtrudeTapered(profile, _geometryLoader.GetProfile(endProfileID), dir, depth);
+                }
+                else if (!profile.isComposite)
                 {
                     geom = Extrude(profile, dir, depth);
                     if (flipWinding)
