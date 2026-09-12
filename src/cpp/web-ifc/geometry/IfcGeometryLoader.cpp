@@ -3548,40 +3548,22 @@ namespace webifc::geometry
       uint32_t transformID = _loader.GetRefArgument();
       glm::dmat3 transformation = GetAxis2Placement2D(transformID);
 
-      if (!profile.isComposite)
+      // Apply the operator to every boundary, including voids and composite children.
+      const auto transformProfile = [&](auto&& self, IfcProfile& value) -> void
       {
-        for (uint32_t i = 0; i < profile.curve.points.size(); i++)
+        const auto transformCurve = [&](IfcCurve& curve)
         {
-          profile.curve.points[i] = transformation * glm::dvec3(profile.curve.points[i].x, profile.curve.points[i].y, 1);
-          profile.curve.points[i].z = 0;
-        }
-        for (auto &hole : profile.holes)
-        {
-          for (uint32_t i = 0; i < hole.points.size(); i++)
+          for (auto& point : curve.points)
           {
-            hole.points[i] = transformation * glm::dvec3(hole.points[i].x, hole.points[i].y, 1);
-            hole.points[i].z = 0;
+            point = transformation * glm::dvec3(point.x, point.y, 1);
+            point.z = 0;
           }
-        }
-      }
-      else
-      {
-        for (uint32_t j = 0; j < profile.profiles.size(); j++)
-        {
-          for (uint32_t i = 0; i < profile.profiles[j].curve.points.size(); i++)
-          {
-            profile.profiles[j].curve.points[i] = transformation * glm::dvec3(profile.profiles[j].curve.points[i].x, profile.profiles[j].curve.points[i].y, 1);
-          }
-          for (auto &hole : profile.profiles[j].holes)
-          {
-            for (uint32_t i = 0; i < hole.points.size(); i++)
-            {
-              hole.points[i] = transformation * glm::dvec3(hole.points[i].x, hole.points[i].y, 1);
-              hole.points[i].z = 0;
-            }
-          }
-        }
-      }
+        };
+        transformCurve(value.curve);
+        for (auto& hole : value.holes) transformCurve(hole);
+        for (auto& child : value.profiles) self(self, child);
+      };
+      transformProfile(transformProfile, profile);
 
       return profile;
     }
