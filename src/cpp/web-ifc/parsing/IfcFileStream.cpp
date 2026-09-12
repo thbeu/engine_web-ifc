@@ -50,6 +50,7 @@
        
   void IfcTokenStream::IfcFileStream::Forward() 
    { 
+     if (IsAtEnd()) return;
      _pointer++;
      if (_pointer == _currentSize && _currentSize != 0)
      {
@@ -98,7 +99,7 @@
    
    char IfcTokenStream::IfcFileStream::Get()
    { 
-     return _buffer[_pointer]; 
+     return _pointer < _currentSize ? _buffer[_pointer] : 0;
    }
 
    IfcTokenStream::IfcFileStream* IfcTokenStream::IfcFileStream::Clone() {
