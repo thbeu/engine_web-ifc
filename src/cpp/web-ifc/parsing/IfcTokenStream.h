@@ -91,7 +91,7 @@ namespace webifc::parsing
             std::function<uint32_t(char *, size_t, size_t)> _dataSource;
             size_t _pointer=0;
             size_t _size;
-            char prev;
+            char prev = 0;
             size_t _currentSize=0;
             size_t _startRef=0;
             char * _buffer;
