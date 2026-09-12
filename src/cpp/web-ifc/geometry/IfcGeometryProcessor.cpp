@@ -2079,6 +2079,7 @@ namespace webifc::geometry
             TriangulateBounds(geometry, bounds3D, expressID);
             break;
         }
+        case schema::IFCFACESURFACE:
         case schema::IFCADVANCEDFACE:
         {
             _loader.MoveToArgumentOffset(expressID, 0);
