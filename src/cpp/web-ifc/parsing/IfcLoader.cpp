@@ -46,10 +46,11 @@ namespace webifc::parsing {
      return ret;
    }
 
-   void IfcLoader::LoadFile(const std::function<uint32_t(char *, size_t, size_t)> &requestData)
+   bool IfcLoader::LoadFile(const std::function<uint32_t(char *, size_t, size_t)> &requestData)
    {
-     _tokenStream->SetTokenSource(requestData);
+     if (!_tokenStream->SetTokenSource(requestData)) return false;
      ParseLines();
+     return true;
    }
 
    IFC_SCHEMA IfcLoader::GetSchema() const
@@ -75,10 +76,11 @@ namespace webifc::parsing {
       return IFC2X3;
    }
 
-   void IfcLoader::LoadFile(std::istream &requestData)
+   bool IfcLoader::LoadFile(std::istream &requestData)
    {
-     _tokenStream->SetTokenSource(requestData);
+     if (!_tokenStream->SetTokenSource(requestData)) return false;
      ParseLines();
+     return true;
    }
 
    void IfcLoader::SaveFile(const std::function<void(char *, size_t)> &outputData, bool orderLinesByExpressID) const
@@ -162,6 +164,11 @@ namespace webifc::parsing {
                 output << "'";
                 output << _tokenStream->ReadString();
                 output << "'";
+                break;
+              }
+              case IfcTokenType::BINARY:
+              {
+                output << '"' << _tokenStream->ReadString() << '"';
                 break;
               }
               case IfcTokenType::ENUM:
@@ -266,6 +273,7 @@ namespace webifc::parsing {
   				case IfcTokenType::SET_BEGIN:
   				case IfcTokenType::SET_END:
   					break;
+  				case IfcTokenType::BINARY:
   				case IfcTokenType::STRING:
           case IfcTokenType::REAL:
           case IfcTokenType::INTEGER:
@@ -533,6 +541,7 @@ namespace webifc::parsing {
              tapeOffsets.push_back(offset);
              _tokenStream->Read<uint32_t>();
              break;
+         case IfcTokenType::BINARY:
          case IfcTokenType::STRING:
          case IfcTokenType::INTEGER:
          case IfcTokenType::REAL:
@@ -586,7 +595,7 @@ namespace webifc::parsing {
      			{
      				_tokenStream->Read<uint32_t>();
      			}
-     			else if (t == IfcTokenType::STRING || t == IfcTokenType::INTEGER || t == IfcTokenType::REAL || t == IfcTokenType::LABEL || t == IfcTokenType::ENUM)
+     			else if (t == IfcTokenType::BINARY || t == IfcTokenType::STRING || t == IfcTokenType::INTEGER || t == IfcTokenType::REAL || t == IfcTokenType::LABEL || t == IfcTokenType::ENUM)
      			{
      				uint16_t length = _tokenStream->Read<uint16_t>();
      				_tokenStream->Forward(length);
@@ -644,6 +653,7 @@ namespace webifc::parsing {
    				return;
    			}
    			break;
+   		case IfcTokenType::BINARY:
    		case IfcTokenType::STRING:
    		case IfcTokenType::ENUM:
    		case IfcTokenType::LABEL:
@@ -692,7 +702,7 @@ namespace webifc::parsing {
 		      continue;
 
         }
-        if (t == IfcTokenType::STRING || t == IfcTokenType::INTEGER || t == IfcTokenType::REAL || t == IfcTokenType::LABEL || t == IfcTokenType::ENUM) {
+        if (t == IfcTokenType::BINARY || t == IfcTokenType::STRING || t == IfcTokenType::INTEGER || t == IfcTokenType::REAL || t == IfcTokenType::LABEL || t == IfcTokenType::ENUM) {
           uint16_t length = _tokenStream->Read<uint16_t>();
           _tokenStream->Forward(length);
           noArguments++;
