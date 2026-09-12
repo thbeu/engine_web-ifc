@@ -90,7 +90,7 @@ namespace webifc::geometry
 		return geom;
 	}
 
-	inline IfcGeometry SweepCircular(const double scaling, const bool closed, const IfcProfile &profile, const double radius, const IfcCurve &directrix, const glm::dvec3 &initialDirectrixNormal = glm::dvec3(0), const bool rotate90 = false)
+	inline IfcGeometry SweepCircular(const double scaling, const bool closed, const IfcProfile &profile, const double radius, const IfcCurve &directrix, const glm::dvec3 &initialDirectrixNormal = glm::dvec3(0), const bool rotate90 = false, const double innerRadius = 0)
 	{
 		spdlog::debug("[SweepCircular({})]");
 
@@ -118,7 +118,7 @@ namespace webifc::geometry
 			profile_vector.push_back(pt2D);
 		}
 
-		return ToIfcGeometry(bimGeometry::SweepCircular(scaling, closed, profile_vector, radius, directrix_vector, initialDirectrixNormal, rotate90));
+		return ToIfcGeometry(bimGeometry::SweepCircular(scaling, closed, profile_vector, radius, directrix_vector, initialDirectrixNormal, rotate90, innerRadius));
 	}
 
 	//! Revolves a profile around an arbitrary axis by rotating each profile point
