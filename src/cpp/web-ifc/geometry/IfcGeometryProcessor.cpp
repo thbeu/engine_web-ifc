@@ -946,7 +946,7 @@ namespace webifc::geometry
                 uint32_t profileID = _loader.GetRefArgument();
                 uint32_t placementID = _loader.GetRefArgument();
                 uint32_t axis1PlacementID = _loader.GetRefArgument();
-                double angle = angleConversion(_loader.GetDoubleArgument(), _cache.GetAngleUnits());
+                double angle = _cache.GetAngularScalingFactor() * angleConversion(_loader.GetDoubleArgument(), _cache.GetAngleUnits());
 
                 IfcProfile profile = _geometryLoader.GetProfile(profileID);
                 glm::dmat4 placement = _geometryLoader.GetLocalPlacement(placementID);
