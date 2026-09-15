@@ -8,6 +8,7 @@
 #include <stack>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <emscripten/bind.h>
 #include <spdlog/spdlog.h>
@@ -495,6 +496,53 @@ bool ValidateIntegerArguments(const emscripten::val &value)
     return true;
 }
 
+// The tape stores encoded STRING lengths as uint16_t. Validate before changing it.
+bool EncodeStringValue(const emscripten::val &value, std::string &text)
+{
+    if (!value.isString()) return false;
+    std::ostringstream encoded;
+    webifc::parsing::p21encode(value.as<std::string>(), encoded);
+    text = encoded.str();
+    return text.size() <= std::numeric_limits<uint16_t>::max();
+}
+
+bool ValidateStringArguments(const emscripten::val &value)
+{
+    if (value.isString())
+    {
+        std::string encoded;
+        return EncodeStringValue(value, encoded);
+    }
+    if (value.isArray())
+    {
+        for (uint32_t i = 0; i < value["length"].as<uint32_t>(); ++i)
+            if (!ValidateStringArguments(value[std::to_string(i)])) return false;
+    }
+    else if (!value.isNull() && !value.isUndefined() && value.typeOf().as<std::string>() == "object")
+    {
+        const auto type = value["type"];
+        if (!type.isNumber()) return true;
+        const auto token = static_cast<webifc::parsing::IfcTokenType>(type.as<uint32_t>());
+        const bool string = token == webifc::parsing::IfcTokenType::STRING ||
+            (token == webifc::parsing::IfcTokenType::LABEL && value["valueType"].isNumber() &&
+             value["valueType"].as<uint32_t>() == webifc::parsing::IfcTokenType::STRING);
+        const auto payload = value["value"];
+        if (string)
+        {
+            std::string encoded;
+            if (payload.isArray())
+            {
+                if (token != webifc::parsing::IfcTokenType::STRING) return false;
+                for (uint32_t i = 0; i < payload["length"].as<uint32_t>(); ++i)
+                    if (!EncodeStringValue(payload[std::to_string(i)], encoded)) return false;
+            }
+            else if (!EncodeStringValue(payload, encoded)) return false;
+        }
+        else if (payload.isArray() && !ValidateStringArguments(payload)) return false;
+    }
+    return true;
+}
+
 bool WriteValue(uint32_t modelID, webifc::parsing::IfcTokenType t, emscripten::val value)
 {
     bool responseCode = true;
@@ -512,9 +560,8 @@ bool WriteValue(uint32_t modelID, webifc::parsing::IfcTokenType t, emscripten::v
     }
     case webifc::parsing::IfcTokenType::STRING:
     {
-        std::ostringstream encoded;
-        webifc::parsing::p21encode(value.as<std::string>(), encoded);
-        const std::string text = encoded.str();
+        std::string text;
+        if (!EncodeStringValue(value, text)) return false;
         loader->Push<uint16_t>(static_cast<uint16_t>(text.size()));
         loader->Push((void*)text.data(), text.size());
         break;
@@ -593,6 +640,10 @@ bool WriteSet(uint32_t modelID, emscripten::val &val)
             {
                 loader->Push<uint8_t>(type);
                 if (type == webifc::parsing::IfcTokenType::BINARY)
+                {
+                    responseCode = WriteValue(modelID, type, innerVal[std::to_string(z)]) && responseCode;
+                }
+                else if (type == webifc::parsing::IfcTokenType::STRING)
                 {
                     responseCode = WriteValue(modelID, type, innerVal[std::to_string(z)]) && responseCode;
                 }
@@ -718,6 +769,11 @@ bool WriteHeaderLine(uint32_t modelID, uint32_t type, emscripten::val parameters
         spdlog::error("Integer write rejected: expected a number within the JavaScript safe integer range");
         return false;
     }
+    if (!ValidateStringArguments(parameters))
+    {
+        spdlog::error("STRING exceeds the encoded tape limit or is not a string");
+        return false;
+    }
     auto loader = manager.GetIfcLoader(modelID);
     uint32_t start = loader->GetTotalSize();
     std::string ifcName = manager.GetSchemaManager().IfcTypeCodeToType(type);
@@ -749,6 +805,11 @@ bool WriteLine(uint32_t modelID, uint32_t expressID, uint32_t type, emscripten::
     if (!ValidateIntegerArguments(parameters))
     {
         spdlog::error("Integer write rejected: expected a number within the JavaScript safe integer range");
+        return false;
+    }
+    if (!ValidateStringArguments(parameters))
+    {
+        spdlog::error("STRING exceeds the encoded tape limit or is not a string");
         return false;
     }
     auto loader = manager.GetIfcLoader(modelID);
