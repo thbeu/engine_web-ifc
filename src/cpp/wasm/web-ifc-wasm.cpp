@@ -428,6 +428,13 @@ bool IsBinaryValue(const emscripten::val &value)
     return value.isString() && webifc::parsing::IsValidStepBinary(value.as<std::string>());
 }
 
+bool IsSafeInteger(const emscripten::val &value)
+{
+    if (!value.isNumber()) return false;
+    const double number = value.as<double>();
+    return std::isfinite(number) && std::floor(number) == number && std::abs(number) <= 9007199254740991.0;
+}
+
 // Validate binary payloads before appending any tokens or replacing a line's tape offset.
 bool ValidateBinaryArguments(const emscripten::val &value)
 {
@@ -454,6 +461,36 @@ bool ValidateBinaryArguments(const emscripten::val &value)
                 if (!IsBinaryValue(payload[std::to_string(i)])) return false;
         }
         else if (payload.isArray()) return ValidateBinaryArguments(payload);
+    }
+    return true;
+}
+
+// Validate integer payloads before appending any tokens or replacing a line's tape offset.
+bool ValidateIntegerArguments(const emscripten::val &value)
+{
+    if (value.isArray())
+    {
+        const uint32_t size = value["length"].as<uint32_t>();
+        for (uint32_t i = 0; i < size; ++i)
+            if (!ValidateIntegerArguments(value[std::to_string(i)])) return false;
+    }
+    else if (!value.isNull() && !value.isUndefined() && value.typeOf().as<std::string>() == "object")
+    {
+        const auto type = value["type"];
+        if (!type.isNumber()) return true;
+        const auto token = static_cast<webifc::parsing::IfcTokenType>(type.as<uint32_t>());
+        const bool integer = token == webifc::parsing::IfcTokenType::INTEGER ||
+            (token == webifc::parsing::IfcTokenType::LABEL && value["valueType"].isNumber() &&
+             value["valueType"].as<uint32_t>() == webifc::parsing::IfcTokenType::INTEGER);
+        const auto payload = value["value"];
+        if (integer)
+        {
+            if (!payload.isArray()) return IsSafeInteger(payload);
+            const uint32_t size = payload["length"].as<uint32_t>();
+            for (uint32_t i = 0; i < size; ++i)
+                if (!IsSafeInteger(payload[std::to_string(i)])) return false;
+        }
+        else if (payload.isArray()) return ValidateIntegerArguments(payload);
     }
     return true;
 }
@@ -518,9 +555,8 @@ bool WriteValue(uint32_t modelID, webifc::parsing::IfcTokenType t, emscripten::v
     }
     case webifc::parsing::IfcTokenType::INTEGER:
     {
-        const double val = value.as<double>();
-        if (!std::isfinite(val) || std::floor(val) != val || std::abs(val) > 9007199254740991.0) return false;
-        loader->PushInt(static_cast<int64_t>(val));
+        if (!IsSafeInteger(value)) return false;
+        loader->PushInt(static_cast<int64_t>(value.as<double>()));
         break;
     }
     default:
@@ -562,9 +598,7 @@ bool WriteSet(uint32_t modelID, emscripten::val &val)
                 }
                 else if (type == webifc::parsing::IfcTokenType::INTEGER)
                 {
-                    const double value = innerVal[std::to_string(z)].as<double>();
-                    if (!std::isfinite(value) || std::floor(value) != value || std::abs(value) > 9007199254740991.0) return false;
-                    loader->PushInt(static_cast<int64_t>(value));
+                    responseCode = WriteValue(modelID, type, innerVal[std::to_string(z)]) && responseCode;
                 }
                 else
                 {
@@ -679,6 +713,11 @@ bool WriteHeaderLine(uint32_t modelID, uint32_t type, emscripten::val parameters
         spdlog::error("Invalid STEP binary value: expected a hex string with valid padding, at most 65535 characters");
         return false;
     }
+    if (!ValidateIntegerArguments(parameters))
+    {
+        spdlog::error("Integer write rejected: expected a number within the JavaScript safe integer range");
+        return false;
+    }
     auto loader = manager.GetIfcLoader(modelID);
     uint32_t start = loader->GetTotalSize();
     std::string ifcName = manager.GetSchemaManager().IfcTypeCodeToType(type);
@@ -705,6 +744,11 @@ bool WriteLine(uint32_t modelID, uint32_t expressID, uint32_t type, emscripten::
     if (!ValidateBinaryArguments(parameters))
     {
         spdlog::error("Invalid STEP binary value: expected a hex string with valid padding, at most 65535 characters");
+        return false;
+    }
+    if (!ValidateIntegerArguments(parameters))
+    {
+        spdlog::error("Integer write rejected: expected a number within the JavaScript safe integer range");
         return false;
     }
     auto loader = manager.GetIfcLoader(modelID);
