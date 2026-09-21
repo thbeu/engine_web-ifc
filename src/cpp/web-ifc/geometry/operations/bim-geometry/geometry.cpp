@@ -311,6 +311,14 @@ namespace bimGeometry
                     planes[f.pId].distance = da;
                 }
             }
+
+            // The spatial index is only needed while planes are being built.
+            // Release it so later copies of this geometry (boolean operands and
+            // results, cloned processors) do not carry the bucket map along;
+            // AddPlane() rebuilds it lazily from the plane values if it is ever
+            // needed again.
+            std::unordered_map<uint64_t, std::vector<uint32_t>>().swap(_planeBuckets);
+            _planeBucketsUpTo = 0;
         }
         // TODO: Remove unused planes
     }
