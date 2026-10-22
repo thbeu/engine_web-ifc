@@ -58,6 +58,7 @@ namespace webifc::geometry
     IfcGeometryLoader& GetLoader();
     IfcFlatMesh GetFlatMesh(uint32_t expressID, bool applyLinearScalingFactor = true);
     IfcComposedMesh GetMesh(uint32_t expressID);
+    void SetExportPolylines(bool v) { _settings._exportPolylines = v; }
     void SetTransformation(const std::array<double, 16> &val);
     void SetCoordinationMatrix(const glm::dmat4& m) { _coordinationMatrix = m; _isCoordinated = true; }
     std::array<double, 16> GetFlatCoordinationMatrix() const;
