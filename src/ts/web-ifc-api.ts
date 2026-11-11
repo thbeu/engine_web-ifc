@@ -89,7 +89,7 @@ export const GEOM_POINTS = 2;
  * @property {number} TOLERANCE_SCALAR_EQUALITY - Tolerance used to compare scalar values as equal.
  * @property {number} PLANE_REFIT_ITERATIONS - Number of iterations used when adjusting triangles to a plane.
  * @property {number} BOOLEAN_UNION_THRESHOLD - Minimum number of solids before triggering a boolean union operation.
- * @property {boolean} EXPORT_POLYLINES - Export wireframe (curve/point) geometry of products without solid geometry. Defaults to true.
+ * @property {boolean} EXPORT_POLYLINES - Export wireframe (curve/point) geometry of products without solid geometry. Defaults to false.
  */
 export interface LoaderSettings {
   /** Allow best-effort parsing of older/preview schemas using incompatible generated layouts.
@@ -112,9 +112,9 @@ export interface LoaderSettings {
   /**
    * Export wireframe (curve/point) geometry of products that carry no solid
    * geometry at all, e.g. IfcAnnotation Curve3D representations, IfcGrid or
-   * IfcGeometricCurveSet (defaults to true). Products that also carry solid
-   * geometry keep exporting triangles only. Set to false to receive triangles
-   * only.
+   * IfcGeometricCurveSet (defaults to false). Products that also carry solid
+   * geometry keep exporting triangles only. Set to true to also receive
+   * wireframe geometry.
    */
   EXPORT_POLYLINES?: boolean;
 }
@@ -551,7 +551,7 @@ export class IfcAPI {
       TOLERANCE_SCALAR_EQUALITY: 1.0e-4,
       PLANE_REFIT_ITERATIONS: 1,
       BOOLEAN_UNION_THRESHOLD: 150,
-      EXPORT_POLYLINES: true,
+      EXPORT_POLYLINES: false,
       ...settings,
     };
     return s;

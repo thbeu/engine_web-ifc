@@ -2184,6 +2184,7 @@ namespace webifc::geometry
 
         glm::dvec4 color = glm::dvec4(1, 1, 1, 1);
         bool hasColor = false;
+
         // Wireframe (curve/point) items are only handed to the client when the
         // product carries no solid/face geometry at all: that keeps annotations,
         // grids and curve sets renderable (issue #533) without adding axis/fill
@@ -2248,8 +2249,11 @@ namespace webifc::geometry
                     _coordinationMatrix = glm::translate(-glm::dvec3(transformedPt));
                     _isCoordinated = true;
                 }
-                else if (geom.numPoints > 0)
+                else if (geom.numPoints > 0 && !geom.isPolygon)
                 {
+                    // Wireframe items (isPolygon) must not take the offset: a
+                    // coordinate restored from a curve/point item is wrong, and
+                    // the offset should be established from the first solid.
                     auto pt = geom.GetPoint(0);
                     auto transformedPt = newMatrix * glm::dvec4(pt, 1);
                     _coordinationMatrix = glm::translate(-glm::dvec3(transformedPt));

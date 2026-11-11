@@ -32,7 +32,9 @@ namespace webifc::geometry
     // contains no solid/face geometry (e.g. IfcAnnotation Curve3D, IfcGrid,
     // IfcGeometricCurveSet). Products that also carry solid geometry keep
     // exporting triangles only, so axis/fill curves of walls & co. never show up.
-    bool _exportPolylines = true;
+    // Off by default so existing triangle-only consumers keep receiving exactly
+    // the same data (see PR #2367 review).
+    bool _exportPolylines = false;
     uint16_t _circleSegments = 12;
     double TOLERANCE_PLANE_INTERSECTION = 1.0E-04;
     double TOLERANCE_PLANE_DEVIATION = 1.0E-04;
@@ -57,7 +59,7 @@ namespace webifc::geometry
   class IfcGeometryProcessor
   {
   public:
-    IfcGeometryProcessor(webifc::parsing::IfcLoader &loader, const webifc::schema::IfcSchemaManager &schemaManager, uint16_t circleSegments, bool coordinateToOrigin, double TOLERANCE_PLANE_INTERSECTION, double TOLERANCE_PLANE_DEVIATION, double TOLERANCE_BACK_DEVIATION_DISTANCE, double TOLERANCE_INSIDE_OUTSIDE_PERIMETER, double TOLERANCE_SCALAR_EQUALITY, double PLANE_REFIT_ITERATIONS, double BOOLEAN_UNION_THRESHOLD, bool exportPolylines = true);
+    IfcGeometryProcessor(webifc::parsing::IfcLoader &loader, const webifc::schema::IfcSchemaManager &schemaManager, uint16_t circleSegments, bool coordinateToOrigin, double TOLERANCE_PLANE_INTERSECTION, double TOLERANCE_PLANE_DEVIATION, double TOLERANCE_BACK_DEVIATION_DISTANCE, double TOLERANCE_INSIDE_OUTSIDE_PERIMETER, double TOLERANCE_SCALAR_EQUALITY, double PLANE_REFIT_ITERATIONS, double BOOLEAN_UNION_THRESHOLD, bool exportPolylines = false);
     IfcGeometry &GetGeometry(uint32_t expressID);
     IfcGeometryLoader& GetLoader();
     IfcFlatMesh GetFlatMesh(uint32_t expressID, bool applyLinearScalingFactor = true);

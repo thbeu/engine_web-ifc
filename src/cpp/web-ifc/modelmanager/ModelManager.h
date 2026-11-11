@@ -36,8 +36,9 @@ namespace webifc::manager
         uint16_t BOOLEAN_UNION_THRESHOLD = 150;
         // Export wireframe (curve/point) geometry of products that carry no solid
         // geometry at all (e.g. IfcAnnotation Curve3D representations, IfcGrid,
-        // IfcGeometricCurveSet). Set to false to receive triangles only.
-        bool EXPORT_POLYLINES = true;
+        // IfcGeometricCurveSet). Defaults to false so existing consumers keep
+        // receiving triangles only; set to true to also receive wireframes.
+        bool EXPORT_POLYLINES = false;
     };
 
     class ModelManager
