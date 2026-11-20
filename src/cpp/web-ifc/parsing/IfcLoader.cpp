@@ -236,19 +236,25 @@ IFC_SCHEMA IfcLoader::GetSchema() const
    {
       ++_revision;
   			_lines.reserve(_tokenStream->GetNoLines());
-        uint32_t currentIfcType = 0;
-  			uint32_t currentExpressID = 0;
-  			uint32_t currentTapeOffset = 0;
-  			while (!_tokenStream->IsAtEnd())
+         uint32_t currentIfcType = 0;
+   			uint32_t currentExpressID = 0;
+   			uint32_t currentTapeOffset = 0;
+   			int32_t setDepth = 0;
+   			while (!_tokenStream->IsAtEnd())
   			{
           IfcTokenType t = static_cast<IfcTokenType>(_tokenStream->Read<char>());
   				switch (t)
   				{
-  				case IfcTokenType::LINE_END:
-  				{
-            if (currentIfcType !=0)
-  					{
-  						IfcLine l = IfcLine();
+   				case IfcTokenType::LINE_END:
+   				{
+             if (setDepth != 0 && (currentIfcType != 0 || currentExpressID != 0))
+             {
+               spdlog::error("[ParseLines()] unbalanced parentheses in entity #{} (net {} open) at offset {} - set will be treated as terminated by line end", currentExpressID, setDepth, _tokenStream->GetReadOffset());
+             }
+             setDepth = 0;
+             if (currentIfcType !=0)
+   					{
+   						IfcLine l = IfcLine();
   						l.ifcType = currentIfcType;
   						l.tapeOffset = currentTapeOffset;
   						if(currentIfcType == webifc::schema::FILE_DESCRIPTION || currentIfcType == webifc::schema::FILE_NAME || currentIfcType == webifc::schema::FILE_SCHEMA )
@@ -267,11 +273,15 @@ IFC_SCHEMA IfcLoader::GetSchema() const
   					currentTapeOffset = _tokenStream->GetReadOffset();
   					break;
   				}
-  				case IfcTokenType::UNKNOWN:
-  				case IfcTokenType::EMPTY:
-  				case IfcTokenType::SET_BEGIN:
-  				case IfcTokenType::SET_END:
-  					break;
+   				case IfcTokenType::UNKNOWN:
+   				case IfcTokenType::EMPTY:
+   					break;
+   				case IfcTokenType::SET_BEGIN:
+   					setDepth++;
+   					break;
+   				case IfcTokenType::SET_END:
+   					setDepth--;
+   					break;
 				case IfcTokenType::BINARY:
   				case IfcTokenType::STRING:
           case IfcTokenType::REAL:
